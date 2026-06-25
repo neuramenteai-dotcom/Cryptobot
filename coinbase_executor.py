@@ -7,6 +7,9 @@ class CoinbaseExecutor:
             'apiKey': COINBASE_API_KEY,
             'secret': COINBASE_API_SECRET,
             'enableRateLimit': True,
+            'options': {
+                'createMarketBuyOrderRequiresPrice': False
+            }
         })
         
         # In simulazione blocchiamo gli ordini, ma l'API resta in lettura live
@@ -37,16 +40,13 @@ class CoinbaseExecutor:
             return {'id': 'sim_buy_no_key'}
             
         try:
-            # Calcolo amount base in base al prezzo
-            ticker = self.exchange.fetch_ticker(symbol)
-            price = ticker['last']
-            amount_base = amount_eur / price
-            
-            order = self.exchange.create_market_buy_order(symbol, amount_base)
-            print(f"Ordino eseguito su Coinbase: BUY {amount_base} {symbol}")
+            # Per i Market Buy su Coinbase Advanced Trade, passando createMarketBuyOrderRequiresPrice=False
+            # l'ammontare è direttamente il costo nella valuta quote (es. EUR).
+            order = self.exchange.create_market_buy_order(symbol, amount_eur)
+            print(f"Ordino eseguito su Coinbase: BUY €{amount_eur} di {symbol}", flush=True)
             return order
         except Exception as e:
-            print(f"Errore BUY Coinbase ({symbol}): {e}")
+            print(f"Errore BUY Coinbase ({symbol}): {e}", flush=True)
             return None
 
     def execute_market_sell(self, symbol, amount_base):
@@ -61,10 +61,10 @@ class CoinbaseExecutor:
             
         try:
             order = self.exchange.create_market_sell_order(symbol, amount_base)
-            print(f"Ordino eseguito su Coinbase: SELL {amount_base} {symbol}")
+            print(f"Ordino eseguito su Coinbase: SELL {amount_base} {symbol}", flush=True)
             return order
         except Exception as e:
-            print(f"Errore SELL Coinbase ({symbol}): {e}")
+            print(f"Errore SELL Coinbase ({symbol}): {e}", flush=True)
             return None
 
     def get_sma(self, symbol, timeframe='5m', period=10):

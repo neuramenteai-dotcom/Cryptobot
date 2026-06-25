@@ -21,7 +21,7 @@ class TradingBot:
     def log_msg(self, msg):
         timestamp = time.strftime('%H:%M:%S')
         full_msg = f"[{timestamp}] {msg}"
-        print(full_msg)
+        print(full_msg, flush=True)
         self.logs.insert(0, full_msg) # Inseriamo in testa per la web UI
         # Mantieni massimo 100 log
         if len(self.logs) > 100:
@@ -158,15 +158,18 @@ class TradingBot:
                                 self.log_msg(f"[SEGNALE] {symbol} in rialzo (+{pct_change:.2f}%). Vol: {volume:,.0f} | Peso Moltiplicatore: {multiplier}x | Investo: €{trade_amount:.2f}")
                                 order = self.executor.execute_market_buy(symbol, trade_amount)
                                 
-                                self.open_positions[symbol] = {
-                                    "entry_price": price,
-                                    "current_price": price,
-                                    "amount_base": trade_amount / price,
-                                    "amount_eur": trade_amount,
-                                    "pnl_pct": 0.0,
-                                    "time": time.strftime('%H:%M:%S')
-                                }
-                                self.current_balance -= trade_amount
+                                if order is not None:
+                                    self.open_positions[symbol] = {
+                                        "entry_price": price,
+                                        "current_price": price,
+                                        "amount_base": trade_amount / price,
+                                        "amount_eur": trade_amount,
+                                        "pnl_pct": 0.0,
+                                        "time": time.strftime('%H:%M:%S')
+                                    }
+                                    self.current_balance -= trade_amount
+                                else:
+                                    self.log_msg(f"[ERRORE] Ordine fallito per {symbol}. Transazione annullata.")
                                 break
                                 
             except Exception as e:
