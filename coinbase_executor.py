@@ -63,3 +63,21 @@ class CoinbaseExecutor:
         except Exception as e:
             print(f"Errore SELL Coinbase ({symbol}): {e}")
             return None
+
+    def get_sma(self, symbol, timeframe='5m', period=10):
+        """Calcola la Simple Moving Average (SMA) scaricando le candele (OHLCV) da Coinbase."""
+        try:
+            # ccxt fetch_ohlcv returns: [timestamp, open, high, low, close, volume]
+            ccxt_symbol = symbol if "/" in symbol else symbol.replace("USD", "/EUR")
+            candles = self.exchange.fetch_ohlcv(ccxt_symbol, timeframe, limit=period)
+            
+            if not candles or len(candles) < period:
+                return None
+                
+            # Estraiamo solo i prezzi di chiusura (index 4)
+            closes = [candle[4] for candle in candles]
+            sma = sum(closes) / len(closes)
+            return sma
+        except Exception as e:
+            print(f"Errore SMA per {symbol}: {e}")
+            return None

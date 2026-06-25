@@ -84,14 +84,27 @@ class TradingBot:
                         pos['current_price'] = current_price
                         pos['pnl_pct'] = pnl_pct
                         
-                        if pnl_pct >= TAKE_PROFIT_PCT:
-                            profit_eur = pos['amount_eur'] * pnl_pct
-                            self.log_msg(f"[TAKE PROFIT] {sym} a ${current_price:.4f} (+€{profit_eur:.2f})")
-                            symbols_to_close.append((sym, profit_eur, 'win'))
+                        # Calcoliamo l'SMA per Trend Following
+                        sma = self.executor.get_sma(sym)
+                        if sma is None: continue
+                        
+                        if current_price < sma:
+                            # Il trend si è invertito, chiudiamo la posizione
+                            if pnl_pct > 0:
+                                profit_eur = pos['amount_eur'] * pnl_pct
+                                self.log_msg(f"[TREND REVERSAL] {sym} sceso sotto SMA. Incasso Profitto: +€{profit_eur:.2f}")
+                                symbols_to_close.append((sym, profit_eur, 'win'))
+                            else:
+                                loss_eur = pos['amount_eur'] * abs(pnl_pct)
+                                self.log_msg(f"[TREND REVERSAL] {sym} sceso sotto SMA. Vendo in Perdita: -€{loss_eur:.2f}")
+                                symbols_to_close.append((sym, -loss_eur, 'loss'))
                         elif pnl_pct <= -STOP_LOSS_PCT:
+                            # Failsafe Hard Stop Loss
                             loss_eur = pos['amount_eur'] * abs(pnl_pct)
-                            self.log_msg(f"[STOP LOSS] {sym} a ${current_price:.4f} (-€{loss_eur:.2f})")
+                            self.log_msg(f"[HARD STOP LOSS] {sym} a ${current_price:.4f} (-€{loss_eur:.2f})")
                             symbols_to_close.append((sym, -loss_eur, 'loss'))
+                        else:
+                            self.log_msg(f"  [HODL] {sym} sopra SMA (${sma:.4f}) | PnL: {pnl_pct*100:.2f}%")
                             
                 for sym, pnl, result_type in symbols_to_close:
                     pos = self.open_positions.pop(sym)
@@ -109,6 +122,12 @@ class TradingBot:
                         price = gainer['price']
                         
                         if symbol not in self.open_positions:
+                            # CHECK TREND
+                            sma = self.executor.get_sma(symbol)
+                            if sma is None or price <= sma:
+                                # Il trend non è confermato
+                                continue
+                                
                             trade_amount = 20.0
                             
                             if self.current_balance < trade_amount:
