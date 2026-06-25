@@ -11,8 +11,8 @@ COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET", "")
 FMP_API_KEY = os.getenv("FMP_API_KEY", "")
 
 # Trading Settings
-TRADE_MODE = os.getenv("TRADE_MODE", "SIMULATION") # "SIMULATION" or "LIVE"
-BUDGET = float(os.getenv("BUDGET", "100.0")) # Valore di default 100 euro
+TRADE_MODE = os.getenv("TRADE_MODE", "LIVE") # Costringiamo il LIVE come default
+BUDGET = float(os.getenv("BUDGET", "150.0")) # Valore di default 150 euro
 
 # Scalping Parameters
 TIMEFRAME = "1m" # 1 minuto per scalping
