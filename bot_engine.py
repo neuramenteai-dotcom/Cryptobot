@@ -116,7 +116,7 @@ class TradingBot:
                     self.log_msg(f"Bilancio Aggiornato: €{self.current_balance:.2f}")
 
                 # 2. Gestione Nuove Entrate (BUY)
-                if gainers and len(self.open_positions) < 3:
+                if gainers and len(self.open_positions) < 10:
                     for gainer in gainers:
                         symbol = gainer['symbol']
                         price = gainer['price']
@@ -128,7 +128,8 @@ class TradingBot:
                                 # Il trend non è confermato
                                 continue
                                 
-                            trade_amount = 20.0
+                            # COMPOUND SIZING: 5% del capitale, ma almeno 5€ per rispettare i minimi di Coinbase
+                            trade_amount = max(5.0, self.current_balance * 0.05)
                             
                             if self.current_balance < trade_amount:
                                 self.free_up_liquidity(trade_amount)
