@@ -128,14 +128,34 @@ class TradingBot:
                                 # Il trend non è confermato
                                 continue
                                 
-                            # COMPOUND SIZING: 5% del capitale, ma almeno 5€ per rispettare i minimi di Coinbase
-                            trade_amount = max(5.0, self.current_balance * 0.05)
+                            # BASE SIZING: 5% del capitale, ma almeno 5€ per rispettare i minimi di Coinbase
+                            base_amount = max(5.0, self.current_balance * 0.05)
+                            
+                            # RISK MANAGEMENT (Weighting & Momentum)
+                            multiplier = 1.0
+                            pct_change = gainer.get('changesPercentage', 0)
+                            volume = gainer.get('volume', 0)
+                            
+                            # Se sta spingendo forte al rialzo (> 15% giornaliero), rischiamo di più per cavalcare
+                            if pct_change > 15.0:
+                                multiplier += 0.5 # +50% di budget
+                            
+                            # Se è una moneta "pesante" (Altissima liquidità, es > 20 Milioni), è più sicura
+                            if volume > 20000000:
+                                multiplier += 0.5 # +50% di budget
+                                
+                            trade_amount = base_amount * multiplier
+                            
+                            # Hard cap per sicurezza: non investire mai più del 15% in una singola moneta
+                            max_allowed = max(5.0, self.current_balance * 0.15)
+                            if trade_amount > max_allowed:
+                                trade_amount = max_allowed
                             
                             if self.current_balance < trade_amount:
                                 self.free_up_liquidity(trade_amount)
                                 
                             if self.current_balance >= trade_amount:
-                                self.log_msg(f"[SEGNALE] {symbol} in rialzo (+{gainer.get('changesPercentage', 0):.2f}%). Compro!")
+                                self.log_msg(f"[SEGNALE] {symbol} in rialzo (+{pct_change:.2f}%). Vol: {volume:,.0f} | Peso Moltiplicatore: {multiplier}x | Investo: €{trade_amount:.2f}")
                                 order = self.executor.execute_market_buy(symbol, trade_amount)
                                 
                                 self.open_positions[symbol] = {

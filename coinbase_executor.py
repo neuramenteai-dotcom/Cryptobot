@@ -28,22 +28,22 @@ class CoinbaseExecutor:
 
     def execute_market_buy(self, symbol, amount_eur):
         """Esegue un ordine di acquisto a mercato."""
+        if TRADE_MODE == "SIMULATION":
+            print(f"[SIMULATION] BUY MOCK di {symbol} per €{amount_eur}")
+            return {'id': 'sim_buy', 'status': 'closed'}
+            
         if not COINBASE_API_KEY:
             print(f"[MOCK] Eseguito BUY Market di {symbol} per €{amount_eur}")
-            return True
+            return {'id': 'sim_buy_no_key'}
             
         try:
-            # Formattazione simbolo da FMP (es. SOLUSD) a ccxt (SOL/USD o SOL/EUR)
-            ccxt_symbol = symbol.replace("USD", "/EUR") # Assumiamo scambi in Euro
-            
-            # Coinbase richiede spesso l'ammontare in base (es. quanti SOL).
-            # Dobbiamo calcolarlo in base al prezzo attuale.
-            ticker = self.exchange.fetch_ticker(ccxt_symbol)
+            # Calcolo amount base in base al prezzo
+            ticker = self.exchange.fetch_ticker(symbol)
             price = ticker['last']
             amount_base = amount_eur / price
             
-            order = self.exchange.create_market_buy_order(ccxt_symbol, amount_base)
-            print(f"Ordino eseguito su Coinbase: BUY {amount_base} {ccxt_symbol}")
+            order = self.exchange.create_market_buy_order(symbol, amount_base)
+            print(f"Ordino eseguito su Coinbase: BUY {amount_base} {symbol}")
             return order
         except Exception as e:
             print(f"Errore BUY Coinbase ({symbol}): {e}")
@@ -51,14 +51,17 @@ class CoinbaseExecutor:
 
     def execute_market_sell(self, symbol, amount_base):
         """Esegue un ordine di vendita a mercato."""
+        if TRADE_MODE == "SIMULATION":
+            print(f"[SIMULATION] SELL MOCK di {symbol} per {amount_base} coin")
+            return {'id': 'sim_sell', 'status': 'closed'}
+            
         if not COINBASE_API_KEY:
             print(f"[MOCK] Eseguito SELL Market di {symbol} per {amount_base} coin")
-            return True
+            return {'id': 'sim_sell_no_key'}
             
         try:
-            ccxt_symbol = symbol.replace("USD", "/EUR")
-            order = self.exchange.create_market_sell_order(ccxt_symbol, amount_base)
-            print(f"Ordino eseguito su Coinbase: SELL {amount_base} {ccxt_symbol}")
+            order = self.exchange.create_market_sell_order(symbol, amount_base)
+            print(f"Ordino eseguito su Coinbase: SELL {amount_base} {symbol}")
             return order
         except Exception as e:
             print(f"Errore SELL Coinbase ({symbol}): {e}")
@@ -68,8 +71,7 @@ class CoinbaseExecutor:
         """Calcola la Simple Moving Average (SMA) scaricando le candele (OHLCV) da Coinbase."""
         try:
             # ccxt fetch_ohlcv returns: [timestamp, open, high, low, close, volume]
-            ccxt_symbol = symbol if "/" in symbol else symbol.replace("USD", "/EUR")
-            candles = self.exchange.fetch_ohlcv(ccxt_symbol, timeframe, limit=period)
+            candles = self.exchange.fetch_ohlcv(symbol, timeframe, limit=period)
             
             if not candles or len(candles) < period:
                 return None
