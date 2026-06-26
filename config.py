@@ -16,5 +16,6 @@ BUDGET = float(os.getenv("BUDGET", "150.0")) # Valore di default 150 euro
 
 # Scalping Parameters
 TIMEFRAME = "1m" # 1 minuto per scalping
-STOP_LOSS_PCT = 0.01 # -1%
+STOP_LOSS_PCT = 0.01 # Stop loss base (utilizzato come failsafe, il trailing è più intelligente)
 TAKE_PROFIT_PCT = 0.02 # +2%
+BLOCKED_ASSETS = ['BTC', 'AIOZ', 'EUR', 'USDC'] # Asset da non liquidare mai

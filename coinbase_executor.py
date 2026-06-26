@@ -1,5 +1,6 @@
 import ccxt
 from config import COINBASE_API_KEY, COINBASE_API_SECRET, TRADE_MODE
+from utils import retry_with_backoff
 
 class CoinbaseExecutor:
     def __init__(self):
@@ -18,6 +19,7 @@ class CoinbaseExecutor:
         else:
             print("Coinbase Executor inizializzato in LIVE Mode! ATTENZIONE.")
 
+    @retry_with_backoff(max_retries=3)
     def get_balance(self):
         if not COINBASE_API_KEY:
             return 100.0 # Valore mockato
@@ -29,6 +31,11 @@ class CoinbaseExecutor:
             print(f"Errore recupero bilancio: {e}")
             return 0.0
 
+    @retry_with_backoff(max_retries=3)
+    def get_tickers(self):
+        return self.exchange.fetch_tickers()
+
+    @retry_with_backoff(max_retries=3)
     def execute_market_buy(self, symbol, amount_eur):
         """Esegue un ordine di acquisto a mercato."""
         if TRADE_MODE == "SIMULATION":
@@ -49,6 +56,7 @@ class CoinbaseExecutor:
             print(f"Errore BUY Coinbase ({symbol}): {e}", flush=True)
             return None
 
+    @retry_with_backoff(max_retries=3)
     def execute_market_sell(self, symbol, amount_base):
         """Esegue un ordine di vendita a mercato."""
         if TRADE_MODE == "SIMULATION":
@@ -67,6 +75,7 @@ class CoinbaseExecutor:
             print(f"Errore SELL Coinbase ({symbol}): {e}", flush=True)
             return None
 
+    @retry_with_backoff(max_retries=3)
     def get_sma(self, symbol, timeframe='5m', period=10):
         """Calcola la Simple Moving Average (SMA) scaricando le candele (OHLCV) da Coinbase."""
         try:

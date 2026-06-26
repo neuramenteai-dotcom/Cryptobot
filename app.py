@@ -29,8 +29,8 @@ def stop_bot():
     bot_instance.stop()
     return jsonify({"status": "stopped"})
 
-# Avvio automatico del bot all'apertura del server (sia in locale che su Render/Gunicorn)
-bot_instance.start()
+# Il bot non si avvia più automaticamente qui per evitare conflitti con i worker di Gunicorn.
+# Usa run_bot.py per eseguire il motore di trading.
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

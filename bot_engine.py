@@ -1,9 +1,10 @@
 import time
 import datetime
 import threading
-from config import TRADE_MODE, BUDGET, STOP_LOSS_PCT, TAKE_PROFIT_PCT
+from config import TRADE_MODE, BUDGET, STOP_LOSS_PCT, TAKE_PROFIT_PCT, BLOCKED_ASSETS
 from fmp_radar import get_crypto_gainers
 from coinbase_executor import CoinbaseExecutor
+import database
 
 COOLDOWN_MINUTES = 30
 
@@ -12,14 +13,21 @@ class TradingBot:
         self.executor = CoinbaseExecutor()
         self.running = False
         self.logs = []
-        self.open_positions = {}
+        
+        # Inizializza o carica le posizioni salvate dal Database SQLite
+        database.init_db()
+        self.open_positions = database.load_trades()
         self.sold_coins = {}
-        self.current_balance = self.executor.get_balance() if TRADE_MODE == "LIVE" else BUDGET
+        
+        # Calcolo approssimativo per ripristinare il balance
+        used_balance = sum(pos['amount_eur'] for pos in self.open_positions.values())
+        self.current_balance = (self.executor.get_balance() if TRADE_MODE == "LIVE" else BUDGET) - used_balance
+        
         self.win_rate = {"wins": 0, "losses": 0}
         self.total_profit = 0.0
         
         # Le monete da NON VENDERE MAI (HODL)
-        self.blocked_assets = ['BTC', 'AIOZ', 'EUR', 'USDC']
+        self.blocked_assets = BLOCKED_ASSETS
         
     def log_msg(self, msg):
         timestamp = time.strftime('%H:%M:%S')
@@ -83,6 +91,14 @@ class TradingBot:
                         if current_price == 0: continue
                         
                         entry_price = pos['entry_price']
+                        highest_price = pos.get('highest_price', entry_price)
+                        
+                        # Aggiorniamo il picco massimo per il Trailing Stop
+                        if current_price > highest_price:
+                            highest_price = current_price
+                            pos['highest_price'] = highest_price
+                            database.save_trade(sym, pos) # Salva su DB
+                            
                         pnl_pct = (current_price - entry_price) / entry_price
                         pos['current_price'] = current_price
                         pos['pnl_pct'] = pnl_pct
@@ -91,26 +107,29 @@ class TradingBot:
                         sma = self.executor.get_sma(sym)
                         if sma is None: continue
                         
-                        if current_price < sma:
-                            # Il trend si è invertito, chiudiamo la posizione
+                        # Trailing Stop: Se scende del STOP_LOSS_PCT rispetto al picco massimo
+                        trailing_stop_price = highest_price * (1 - STOP_LOSS_PCT)
+                        
+                        if current_price < trailing_stop_price:
                             if pnl_pct > 0:
                                 profit_eur = pos['amount_eur'] * pnl_pct
-                                self.log_msg(f"[TREND REVERSAL] {sym} sceso sotto SMA. Incasso Profitto: +€{profit_eur:.2f}")
+                                self.log_msg(f"[TRAILING STOP] {sym} sceso dal picco. Incasso Profitto: +€{profit_eur:.2f}")
                                 symbols_to_close.append((sym, profit_eur, 'win'))
                             else:
                                 loss_eur = pos['amount_eur'] * abs(pnl_pct)
-                                self.log_msg(f"[TREND REVERSAL] {sym} sceso sotto SMA. Vendo in Perdita: -€{loss_eur:.2f}")
+                                self.log_msg(f"[STOP LOSS] {sym} sceso a ${current_price:.4f} (-€{loss_eur:.2f})")
                                 symbols_to_close.append((sym, -loss_eur, 'loss'))
-                        elif pnl_pct <= -STOP_LOSS_PCT:
-                            # Failsafe Hard Stop Loss
-                            loss_eur = pos['amount_eur'] * abs(pnl_pct)
-                            self.log_msg(f"[HARD STOP LOSS] {sym} a ${current_price:.4f} (-€{loss_eur:.2f})")
-                            symbols_to_close.append((sym, -loss_eur, 'loss'))
+                        elif current_price < sma and pnl_pct > 0.005:
+                            # Chiusura precauzionale in profitto se si perde la SMA
+                            profit_eur = pos['amount_eur'] * pnl_pct
+                            self.log_msg(f"[TREND REVERSAL] {sym} perso SMA. Incasso: +€{profit_eur:.2f}")
+                            symbols_to_close.append((sym, profit_eur, 'win'))
                         else:
-                            self.log_msg(f"  [HODL] {sym} sopra SMA (${sma:.4f}) | PnL: {pnl_pct*100:.2f}%")
+                            self.log_msg(f"  [HOLD] {sym} | PnL: {pnl_pct*100:.2f}% | Max: {highest_price:.4f} | Stop: {trailing_stop_price:.4f}")
                             
                 for sym, pnl, result_type in symbols_to_close:
                     pos = self.open_positions.pop(sym)
+                    database.remove_trade(sym) # Rimuovi dal DB
                     self.executor.execute_market_sell(sym, pos["amount_base"])
                     self.current_balance += (pos["amount_eur"] + pnl)
                     self.total_profit += pnl
@@ -177,14 +196,18 @@ class TradingBot:
                                 order = self.executor.execute_market_buy(symbol, trade_amount)
                                 
                                 if order is not None:
-                                    self.open_positions[symbol] = {
+                                    trade_data = {
                                         "entry_price": price,
                                         "current_price": price,
+                                        "highest_price": price,
                                         "amount_base": trade_amount / price,
                                         "amount_eur": trade_amount,
                                         "pnl_pct": 0.0,
                                         "time": time.strftime('%H:%M:%S')
                                     }
+                                    self.open_positions[symbol] = trade_data
+                                    database.save_trade(symbol, trade_data) # Salva su DB
+                                    
                                     self.current_balance -= trade_amount
                                 else:
                                     self.log_msg(f"[ERRORE] Ordine fallito per {symbol}. Transazione annullata.")

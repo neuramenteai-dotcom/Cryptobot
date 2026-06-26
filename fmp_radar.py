@@ -1,6 +1,8 @@
 import ccxt
 from config import COINBASE_API_KEY, COINBASE_API_SECRET
+from utils import retry_with_backoff
 
+@retry_with_backoff(max_retries=3)
 def get_crypto_gainers(min_price=0.01, min_pct_change=2.0):
     """
     Trova i Gainers direttamente usando Coinbase tramite ccxt.
@@ -33,13 +35,20 @@ def get_crypto_gainers(min_price=0.01, min_pct_change=2.0):
             if price is None: price = 0
             if pct_change is None: pct_change = 0
             
+            volume = ticker.get('baseVolume', 0)
+            
+            # FILTRO VOLUME: Ignora monete troppo piccole (es. meno di 100.000 monete scambiate in 24h)
+            if volume < 100000:
+                continue
+                
             if price >= min_price and pct_change >= min_pct_change:
                 filtered_gainers.append({
                     "symbol": symbol,
                     "price": price,
                     "changesPercentage": pct_change,
-                    "volume": ticker.get('baseVolume', 0)
+                    "volume": volume
                 })
+
         
         # Ordina per variazione % decrescente
         filtered_gainers.sort(key=lambda x: x["changesPercentage"], reverse=True)
