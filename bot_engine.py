@@ -29,6 +29,10 @@ class TradingBot:
         # Le monete da NON VENDERE MAI (HODL)
         self.blocked_assets = BLOCKED_ASSETS
         
+        # --- V2 Features ---
+        self.consecutive_losses = 0
+        self.circuit_breaker_until = None
+        
     def log_msg(self, msg):
         timestamp = time.strftime('%H:%M:%S')
         full_msg = f"[{timestamp}] {msg}"
@@ -73,6 +77,17 @@ class TradingBot:
         
         while self.running:
             try:
+                # Controlla Circuit Breaker
+                if self.circuit_breaker_until and time.time() < self.circuit_breaker_until:
+                    minutes_left = int((self.circuit_breaker_until - time.time()) / 60)
+                    self.log_msg(f"[CIRCUIT BREAKER] Bot in pausa per sicurezza. Ripresa tra {minutes_left} min.")
+                    time.sleep(60)
+                    continue
+                elif self.circuit_breaker_until and time.time() >= self.circuit_breaker_until:
+                    self.log_msg("[CIRCUIT BREAKER] Pausa terminata. Il bot riprende a operare.")
+                    self.circuit_breaker_until = None
+                    self.consecutive_losses = 0
+                    
                 self.log_msg("Scansione Mercato in corso...")
                 gainers = get_crypto_gainers(min_pct_change=3.0)
                 
@@ -135,10 +150,17 @@ class TradingBot:
                     self.total_profit += pnl
                     if result_type == 'win': 
                         self.win_rate['wins'] += 1
+                        self.consecutive_losses = 0
                     else: 
                         self.win_rate['losses'] += 1
+                        self.consecutive_losses += 1
                         self.sold_coins[sym] = datetime.datetime.now()
                         self.log_msg(f"  ⚠️ {sym} in cooldown per {COOLDOWN_MINUTES} minuti")
+                        
+                        if self.consecutive_losses >= 3:
+                            self.log_msg("[CIRCUIT BREAKER] 3 perdite consecutive. Attivazione pausa di emergenza.")
+                            self.circuit_breaker_until = time.time() + (30 * 60)
+                            
                     self.log_msg(f"Bilancio Aggiornato: €{self.current_balance:.2f}")
 
                 # Pulisci il cooldown Expired
@@ -191,8 +213,19 @@ class TradingBot:
                             if self.current_balance < trade_amount:
                                 self.free_up_liquidity(trade_amount)
                                 
+                            # V2 Feature: Verifica RSI e MACD prima di comprare
+                            rsi, macd_bullish = self.executor.get_indicators(symbol)
+                            if rsi is None: continue
+                            if rsi >= 70:
+                                self.log_msg(f"[FILTRO] {symbol} scartato: RSI troppo alto ({rsi:.1f} - Ipercomprato)")
+                                continue
+                            if not macd_bullish:
+                                self.log_msg(f"[FILTRO] {symbol} scartato: MACD non rialzista")
+                                continue
+                                
                             if self.current_balance >= trade_amount:
-                                self.log_msg(f"[SEGNALE] {symbol} in rialzo (+{pct_change:.2f}%). Vol: {volume:,.0f} | Peso Moltiplicatore: {multiplier}x | Investo: €{trade_amount:.2f}")
+                                self.log_msg(f"[SEGNALE] {symbol} forte (Sopra SMA, RSI: {rsi:.1f}, MACD: Ok). Acquisto in corso...")
+                                self.log_msg(f"Investo: €{trade_amount:.2f} | Vol: {volume:,.0f}")
                                 order = self.executor.execute_market_buy(symbol, trade_amount)
                                 
                                 if order is not None:

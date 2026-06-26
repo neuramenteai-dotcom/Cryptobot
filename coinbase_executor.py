@@ -1,6 +1,6 @@
 import ccxt
 from config import COINBASE_API_KEY, COINBASE_API_SECRET, TRADE_MODE
-from utils import retry_with_backoff
+from utils import retry_with_backoff, calculate_rsi, calculate_macd
 
 class CoinbaseExecutor:
     def __init__(self):
@@ -92,3 +92,33 @@ class CoinbaseExecutor:
         except Exception as e:
             print(f"Errore SMA per {symbol}: {e}")
             return None
+
+    @retry_with_backoff(max_retries=3)
+    def get_indicators(self, symbol, timeframe='5m', period=100):
+        """Scarica le candele e calcola RSI e MACD."""
+        try:
+            candles = self.exchange.fetch_ohlcv(symbol, timeframe, limit=period)
+            if not candles or len(candles) < period:
+                return None, None
+                
+            closes = [candle[4] for candle in candles]
+            
+            rsi_series = calculate_rsi(closes)
+            macd_line, signal_line, histogram = calculate_macd(closes)
+            
+            if not rsi_series or not macd_line:
+                return None, None
+                
+            current_rsi = rsi_series[-1]
+            
+            # Check se macd e' bullish (macd_line > signal_line e histogram > 0)
+            # Dobbiamo assicurarci che non ci siano None alla fine
+            macd_bullish = False
+            if macd_line[-1] is not None and signal_line[-1] is not None and histogram[-1] is not None:
+                macd_bullish = macd_line[-1] > signal_line[-1] and histogram[-1] > 0
+                
+            return current_rsi, macd_bullish
+            
+        except Exception as e:
+            print(f"Errore Indicators per {symbol}: {e}")
+            return None, None
