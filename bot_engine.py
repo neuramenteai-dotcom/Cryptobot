@@ -69,10 +69,55 @@ class TradingBot:
         except Exception as e:
             self.log_msg(f"Errore controllo portafoglio: {e}")
 
+    def sync_portfolio(self):
+        """Scansiona il portafoglio Coinbase e adotta le monete orfane."""
+        self.log_msg("Sincronizzazione Portafoglio in corso...")
+        try:
+            balances = self.executor.exchange.fetch_balance()
+            tickers = self.executor.exchange.fetch_tickers()
+            
+            for asset, amount in balances.get('total', {}).items():
+                if amount > 0 and asset not in self.blocked_assets:
+                    symbol = f"{asset}/EUR"
+                    
+                    # Evitiamo di sovrascrivere posizioni già caricate dal DB
+                    if symbol in self.open_positions:
+                        continue
+                        
+                    if symbol in tickers:
+                        current_price = tickers[symbol].get('last', 0)
+                        if current_price == 0: continue
+                        
+                        amount_eur = amount * current_price
+                        # Ignora la polvere (es. rimasugli minori di 2 euro)
+                        if amount_eur < 2.0:
+                            continue
+                            
+                        self.log_msg(f"[SYNC] Trovato {amount} {asset} (Valore: €{amount_eur:.2f}). Aggiunto al monitoraggio.")
+                        
+                        trade_data = {
+                            "entry_price": current_price, # Usiamo il prezzo attuale come fallback
+                            "current_price": current_price,
+                            "highest_price": current_price,
+                            "amount_base": amount,
+                            "amount_eur": amount_eur,
+                            "pnl_pct": 0.0,
+                            "time": time.strftime('%H:%M:%S')
+                        }
+                        self.open_positions[symbol] = trade_data
+                        import database
+                        database.save_trade(symbol, trade_data)
+                        
+        except Exception as e:
+            self.log_msg(f"Errore durante la sincronizzazione: {e}")
+
     def loop(self):
         self.log_msg(f"Avvio Bot in Modalità: {TRADE_MODE}")
         self.log_msg(f"Budget: €{BUDGET} | SL: -{STOP_LOSS_PCT*100}% | TP: +{TAKE_PROFIT_PCT*100}%")
         self.log_msg(f"Asset Protetti (Non verranno venduti): {', '.join(self.blocked_assets)}")
+        
+        # Sincronizza per adottare eventuali coin non tracciate dopo un riavvio
+        self.sync_portfolio()
         
         while self.running:
             try:
