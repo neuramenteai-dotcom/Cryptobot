@@ -2,7 +2,6 @@ import time
 import datetime
 import threading
 from config import TRADE_MODE, BUDGET, STOP_LOSS_PCT, TAKE_PROFIT_PCT, BLOCKED_ASSETS
-from fmp_radar import get_crypto_gainers
 from coinbase_executor import CoinbaseExecutor
 import database
 
@@ -89,12 +88,6 @@ class TradingBot:
                     self.consecutive_losses = 0
                     
                 self.log_msg("Scansione Mercato in corso...")
-                gainers = get_crypto_gainers(min_pct_change=2.0)
-                
-                if not gainers:
-                    self.log_msg("Nessun asset con +2% di crescita trovato. Attesa...")
-                else:
-                    self.log_msg(f"Trovati {len(gainers)} asset in crescita. Valutazione in corso...")
                 
                 try:
                     tickers = self.executor.exchange.fetch_tickers()
@@ -102,6 +95,23 @@ class TradingBot:
                     self.log_msg(f"Errore connessione Coinbase: {e}")
                     time.sleep(10)
                     continue
+                    
+                # Filtra Gainers direttamente qui per evitare freeze
+                gainers = []
+                for sym, ticker in tickers.items():
+                    if "/EUR" in sym:
+                        price = ticker.get('last', 0)
+                        pct_change = ticker.get('percentage', 0)
+                        volume = ticker.get('baseVolume', 0)
+                        if price and pct_change and volume > 100000 and pct_change >= 2.0:
+                            gainers.append({"symbol": sym, "price": price, "changesPercentage": pct_change, "volume": volume})
+                
+                gainers.sort(key=lambda x: x["changesPercentage"], reverse=True)
+                
+                if not gainers:
+                    self.log_msg("Nessun asset con +2% di crescita trovato. Attesa...")
+                else:
+                    self.log_msg(f"Trovati {len(gainers)} asset in crescita. Valutazione in corso...")
                     
                 # 1. Gestione Posizioni Aperte (SELL)
                 symbols_to_close = []
