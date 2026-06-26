@@ -5,12 +5,15 @@ from config import TRADE_MODE, BUDGET, STOP_LOSS_PCT, TAKE_PROFIT_PCT
 from fmp_radar import get_crypto_gainers
 from coinbase_executor import CoinbaseExecutor
 
+COOLDOWN_MINUTES = 30
+
 class TradingBot:
     def __init__(self):
         self.executor = CoinbaseExecutor()
         self.running = False
         self.logs = []
         self.open_positions = {}
+        self.sold_coins = {}
         self.current_balance = self.executor.get_balance() if TRADE_MODE == "LIVE" else BUDGET
         self.win_rate = {"wins": 0, "losses": 0}
         self.total_profit = 0.0
@@ -111,15 +114,30 @@ class TradingBot:
                     self.executor.execute_market_sell(sym, pos["amount_base"])
                     self.current_balance += (pos["amount_eur"] + pnl)
                     self.total_profit += pnl
-                    if result_type == 'win': self.win_rate['wins'] += 1
-                    else: self.win_rate['losses'] += 1
+                    if result_type == 'win': 
+                        self.win_rate['wins'] += 1
+                    else: 
+                        self.win_rate['losses'] += 1
+                        self.sold_coins[sym] = datetime.datetime.now()
+                        self.log_msg(f"  ⚠️ {sym} in cooldown per {COOLDOWN_MINUTES} minuti")
                     self.log_msg(f"Bilancio Aggiornato: €{self.current_balance:.2f}")
+
+                # Pulisci il cooldown Expired
+                self.sold_coins = {k: v for k, v in self.sold_coins.items() if (datetime.datetime.now() - v).total_seconds() < COOLDOWN_MINUTES * 60}
 
                 # 2. Gestione Nuove Entrate (BUY)
                 if gainers and len(self.open_positions) < 10:
                     for gainer in gainers:
                         symbol = gainer['symbol']
                         price = gainer['price']
+                        
+                        # Filtro HODL assets
+                        if 'BTC' in symbol or 'AIOZ' in symbol:
+                            continue
+                            
+                        # Skip se in cooldown
+                        if symbol in self.sold_coins:
+                            continue
                         
                         if symbol not in self.open_positions:
                             # CHECK TREND

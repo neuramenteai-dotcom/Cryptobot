@@ -3,7 +3,7 @@ import datetime
 from config import BUDGET, STOP_LOSS_PCT
 
 # Configurazioni
-PAIRS = ['BTC-USD', 'ETH-USD', 'SOL-USD']
+PAIRS = ['ETH-USD', 'SOL-USD', 'AVAX-USD', 'LINK-USD', 'DOT-USD'] # Esclusi BTC e AIOZ
 GRANULARITY = 300 # Candele da 5 minuti (300 secondi)
 SIMULATION_HOURS = 24
 SMA_PERIOD = 10
@@ -42,7 +42,7 @@ def run_scalping_simulation():
     print(f"Budget Iniziale: €{BUDGET}")
     print(f"Stop-Loss: {STOP_LOSS_PCT*100}% | SMA: {SMA_PERIOD} periodi su {GRANULARITY//60} min")
     
-    end_time = datetime.datetime.utcnow()
+    end_time = datetime.datetime.now(datetime.timezone.utc)
     start_time = end_time - datetime.timedelta(hours=SIMULATION_HOURS)
     
     total_trades = 0
@@ -60,6 +60,7 @@ def run_scalping_simulation():
         in_position = False
         entry_price = 0.0
         trade_amount = 20.0
+        cooldown_until = 0  # Indice della candela fino alla quale non operare
         
         for i in range(SMA_PERIOD, len(df)):
             current_candle = df[i]
@@ -74,8 +75,8 @@ def run_scalping_simulation():
             
             current_price = current_candle['close']
             
-            # Segnale Acquisto: Forte rialzo E Prezzo Sopra Media Mobile
-            if not in_position and pct_change > 0.001 and current_candle['volume'] > vol_ma and current_price > sma:
+            # Segnale Acquisto: Forte rialzo E Prezzo Sopra Media Mobile E non in cooldown
+            if not in_position and i >= cooldown_until and pct_change > 0.001 and current_candle['volume'] > vol_ma and current_price > sma:
                 in_position = True
                 entry_price = current_price
                 # print(f"BUY {pair} a {entry_price}")
@@ -91,10 +92,10 @@ def run_scalping_simulation():
                     total_trades += 1
                     if pnl > 0:
                         winning_trades += 1
-                        # print(f"SELL {pair} a {current_price} (+€{pnl:.2f})")
                     else:
                         losing_trades += 1
-                        # print(f"SELL {pair} a {current_price} (-€{abs(pnl):.2f})")
+                        # Imposta cooldown di 30 minuti (6 candele da 5 minuti)
+                        cooldown_until = i + 6
                     in_position = False
                     
                 # Hard Stop Loss (Failsafe contro i crolli verticali)
@@ -104,6 +105,8 @@ def run_scalping_simulation():
                     total_trades += 1
                     losing_trades += 1
                     in_position = False
+                    # Imposta cooldown di 30 minuti (6 candele da 5 minuti)
+                    cooldown_until = i + 6
                     # print(f"STOP LOSS {pair} a {current_price} (-€{loss:.2f})")
                     
     print("\n=================================")
