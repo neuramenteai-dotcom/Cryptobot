@@ -89,10 +89,10 @@ class TradingBot:
                     self.consecutive_losses = 0
                     
                 self.log_msg("Scansione Mercato in corso...")
-                gainers = get_crypto_gainers(min_pct_change=3.0)
+                gainers = get_crypto_gainers(min_pct_change=2.0)
                 
                 if not gainers:
-                    self.log_msg("Nessun asset con +3% di crescita trovato. Attesa...")
+                    self.log_msg("Nessun asset con +2% di crescita trovato. Attesa...")
                 else:
                     self.log_msg(f"Trovati {len(gainers)} asset in crescita. Valutazione in corso...")
                 
