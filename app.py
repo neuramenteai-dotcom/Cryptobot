@@ -29,7 +29,8 @@ def stop_bot():
     bot_instance.stop()
     return jsonify({"status": "stopped"})
 
+# Avvio automatico del bot all'apertura del server (sia in locale che su Render/Gunicorn)
+bot_instance.start()
+
 if __name__ == '__main__':
-    # Avvio automatico del bot all'apertura del server
-    bot_instance.start()
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -23,8 +23,8 @@ def get_crypto_gainers(min_price=0.01, min_pct_change=2.0):
         
         filtered_gainers = []
         for symbol, ticker in tickers.items():
-            # Filtriamo solo le coin scambiate contro EUR o USD (es. BTC/EUR)
-            if not ("/EUR" in symbol or "/USD" in symbol):
+            # Filtriamo SOLO le coin scambiate contro EUR (es. BTC/EUR), ignorando i dollari
+            if not ("/EUR" in symbol):
                 continue
                 
             price = ticker.get('last', 0)
