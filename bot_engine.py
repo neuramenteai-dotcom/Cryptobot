@@ -91,6 +91,11 @@ class TradingBot:
                 self.log_msg("Scansione Mercato in corso...")
                 gainers = get_crypto_gainers(min_pct_change=3.0)
                 
+                if not gainers:
+                    self.log_msg("Nessun asset con +3% di crescita trovato. Attesa...")
+                else:
+                    self.log_msg(f"Trovati {len(gainers)} asset in crescita. Valutazione in corso...")
+                
                 try:
                     tickers = self.executor.exchange.fetch_tickers()
                 except Exception as e:
@@ -185,6 +190,8 @@ class TradingBot:
                             sma = self.executor.get_sma(symbol)
                             if sma is None or price <= sma:
                                 # Il trend non è confermato
+                                sma_val = f"{sma:.4f}" if sma is not None else "N/A"
+                                self.log_msg(f"[FILTRO] {symbol} scartato: Prezzo (${price:.4f}) sotto la SMA ({sma_val})")
                                 continue
                                 
                             # BASE SIZING: 5% del capitale, ma almeno 5€ per rispettare i minimi di Coinbase
