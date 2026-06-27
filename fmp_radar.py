@@ -1,67 +1,87 @@
-import ccxt
-from config import COINBASE_API_KEY, COINBASE_API_SECRET
-from utils import retry_with_backoff
+"""Radar FMP v2 — usa la nuova API 'stable' di Financial Modeling Prep.
 
-@retry_with_backoff(max_retries=3)
-def get_crypto_gainers(min_price=0.01, min_pct_change=2.0):
-    """
-    Trova i Gainers direttamente usando Coinbase tramite ccxt.
-    Non usiamo più FMP perché richiede abbonamenti premium per i dati Crypto in tempo reale.
-    """
-    try:
-        # Usiamo Coinbase in sola lettura pubblica se non ci sono le chiavi, 
-        # altrimenti usiamo le chiavi per evitare rate-limit stringenti.
-        if COINBASE_API_KEY:
-            exchange = ccxt.coinbase({
-                'apiKey': COINBASE_API_KEY,
-                'secret': COINBASE_API_SECRET,
-                'enableRateLimit': True,
-            })
-        else:
-            exchange = ccxt.coinbase({'enableRateLimit': True})
-            
-        print("Recupero ticker live da Coinbase...")
-        tickers = exchange.fetch_tickers()
-        
-        filtered_gainers = []
-        for symbol, ticker in tickers.items():
-            # Filtriamo SOLO le coin scambiate contro EUR (es. BTC/EUR), ignorando i dollari
-            if not ("/EUR" in symbol):
-                continue
-                
-            price = ticker.get('last', 0)
-            pct_change = ticker.get('percentage', 0)
-            
-            if price is None: price = 0
-            if pct_change is None: pct_change = 0
-            
-            volume = ticker.get('baseVolume', 0)
-            
-            # FILTRO VOLUME: Ignora monete troppo piccole (es. meno di 100.000 monete scambiate in 24h)
-            if volume < 100000:
-                continue
-                
-            if price >= min_price and pct_change >= min_pct_change:
-                filtered_gainers.append({
-                    "symbol": symbol,
-                    "price": price,
-                    "changesPercentage": pct_change,
-                    "volume": volume
-                })
+- Momentum/quote crypto: disponibile sul piano gratuito (endpoint stable/quote).
+- News/sentiment: richiede piano FMP a pagamento (free => HTTP 402). Se non
+  disponibile, degrada in modo trasparente (ritorna None = neutro).
 
-        
-        # Ordina per variazione % decrescente
-        filtered_gainers.sort(key=lambda x: x["changesPercentage"], reverse=True)
-        return filtered_gainers
-        
-    except Exception as e:
-        print(f"Errore recupero Gainers da Coinbase: {e}")
-        return []
+Il radar e' un segnale SOFT: arricchisce/conferma la selezione, non blocca mai
+il trading se FMP e' irraggiungibile.
+"""
+import time
+import requests
+from config import FMP_API_KEY, FMP_ENABLED, FMP_NEWS_ENABLED
 
-if __name__ == "__main__":
-    # Test
-    print("Test Coinbase Radar Engine...")
-    gainers = get_crypto_gainers(min_price=0.1, min_pct_change=1.0)
-    print(f"Trovati {len(gainers)} gainers.")
-    for g in gainers[:5]:
-        print(f"{g['symbol']} | Prezzo: ${g['price']} | Var: +{g['changesPercentage']:.2f}%")
+BASE = "https://financialmodelingprep.com/stable"
+_CACHE_TTL = 600  # 10 minuti
+
+
+class FmpRadar:
+    def __init__(self):
+        self.enabled = bool(FMP_ENABLED and FMP_API_KEY)
+        self._cache = {}             # base -> (timestamp, dict)
+        self._news_unavailable = False  # True dopo un 402 (evita richieste inutili)
+
+    def _get(self, path, params=None):
+        params = dict(params or {})
+        params["apikey"] = FMP_API_KEY
+        r = requests.get(f"{BASE}/{path}", params=params, timeout=12)
+        if r.status_code == 402:
+            return ("PAID", None)
+        if r.status_code != 200:
+            return ("ERR", None)
+        try:
+            return ("OK", r.json())
+        except ValueError:
+            return ("ERR", None)
+
+    def get_signal(self, base):
+        """Ritorna {'fmp_change': float|None, 'news_sentiment': float|None,
+        'available': bool}. Cache 10 min. Non solleva mai eccezioni."""
+        if not self.enabled:
+            return {"fmp_change": None, "news_sentiment": None, "available": False}
+
+        now = time.time()
+        cached = self._cache.get(base)
+        if cached and (now - cached[0]) < _CACHE_TTL:
+            return cached[1]
+
+        signal = {"fmp_change": None, "news_sentiment": None, "available": True}
+        try:
+            status, data = self._get("quote", {"symbol": f"{base}USD"})
+            if status == "OK" and isinstance(data, list) and data:
+                q = data[0]
+                signal["fmp_change"] = q.get("changePercentage") or q.get("changesPercentage")
+        except Exception:
+            pass
+
+        if FMP_NEWS_ENABLED and not self._news_unavailable:
+            try:
+                signal["news_sentiment"] = self._news_sentiment(base)
+            except Exception:
+                signal["news_sentiment"] = None
+
+        self._cache[base] = (now, signal)
+        return signal
+
+    def _news_sentiment(self, base):
+        """Sentiment grezzo dalle news (richiede FMP a pagamento). None se non disponibile."""
+        status, data = self._get("news/crypto", {"symbols": f"{base}USD", "limit": 10})
+        if status == "PAID":
+            self._news_unavailable = True
+            return None
+        if status != "OK" or not isinstance(data, list) or not data:
+            return None
+        pos = ("surge", "rally", "soar", "bull", "gain", "high", "adopt", "partnership", "launch", "approve")
+        neg = ("crash", "drop", "plunge", "bear", "loss", "hack", "lawsuit", "ban", "dump", "exploit")
+        score = 0
+        items = data[:10]
+        for art in items:
+            title = (art.get("title") or "").lower()
+            score += sum(1 for w in pos if w in title)
+            score -= sum(1 for w in neg if w in title)
+        return score / max(len(items), 1)  # >0 bullish, <0 bearish
+
+
+# Compat: vecchia firma usata da main.py legacy (non piu' nel path attivo)
+def get_crypto_gainers(*args, **kwargs):
+    return []

@@ -249,8 +249,17 @@
                         <div class="metric-title">Operazioni (Vinte/Perse)</div>
                         <div class="metric-value" id="winrate">0 / 0</div>
                     </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Netto post-abbonamento</div>
+                        <div class="metric-value" id="netSub">€0.00</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Franchigia Coinbase One</div>
+                        <div class="metric-value" id="allowance">€0</div>
+                    </div>
                 </div>
-                <div class="fee-note" id="feeNote">Fee/lato: -- % · Breakeven lordo richiesto: -- %</div>
+                <div class="fee-note" id="feeNote">Fee/lato: -- % · Breakeven lordo: -- %</div>
+                <div class="fee-note" id="infoNote">Quote attive: -- · Nuove listing: --</div>
             </div>
 
             <div class="glass-panel">
@@ -332,9 +341,25 @@
                 }
                 document.getElementById('winrate').innerText = `${data.win_rate.wins} / ${data.win_rate.losses}`;
 
+                if (typeof data.net_after_subscription === 'number') {
+                    const ns = document.getElementById('netSub');
+                    ns.innerText = `€${data.net_after_subscription.toFixed(2)}`;
+                    ns.className = 'metric-value ' + (data.net_after_subscription >= 0 ? 'text-green' : 'text-red');
+                }
+                if (typeof data.free_allowance_left === 'number') {
+                    document.getElementById('allowance').innerText =
+                        `€${Math.round(data.free_allowance_left)}`;
+                }
                 if (typeof data.fee_rate_pct === 'number') {
+                    const measured = data.fee_measured ? 'misurata' : 'stimata';
                     document.getElementById('feeNote').innerText =
-                        `Fee/lato: ${data.fee_rate_pct}% · Breakeven lordo richiesto: ${data.breakeven_pct}%`;
+                        `Fee/lato (${measured}): ${data.fee_rate_pct}% · Breakeven lordo: ${data.breakeven_pct}%` +
+                        (data.coinbase_one ? ` · Volume mese: €${data.monthly_volume}` : '');
+                }
+                if (data.enabled_quotes) {
+                    const nl = (data.new_listings && data.new_listings.length) ? data.new_listings.join(', ') : 'nessuna';
+                    document.getElementById('infoNote').innerText =
+                        `Quote attive: ${data.enabled_quotes.join(', ')} · Nuove listing: ${nl}`;
                 }
 
                 // Aggiorna Posizioni Aperte

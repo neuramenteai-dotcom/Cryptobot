@@ -35,7 +35,9 @@ def init_db():
 
     # Migrazione: aggiunge colonne mancanti su DB preesistenti
     for col, decl in (("entry_fee_eur", "REAL DEFAULT 0"),
-                      ("adopted", "INTEGER DEFAULT 0")):
+                      ("adopted", "INTEGER DEFAULT 0"),
+                      ("quote", "TEXT DEFAULT 'EUR'"),
+                      ("new_listing", "INTEGER DEFAULT 0")):
         try:
             cursor.execute(f"ALTER TABLE open_trades ADD COLUMN {col} {decl}")
             conn.commit()
@@ -51,8 +53,8 @@ def save_trade(symbol, trade_data):
     cursor.execute("""
         INSERT OR REPLACE INTO open_trades
         (symbol, entry_price, current_price, highest_price, amount_base,
-         amount_eur, entry_fee_eur, adopted, time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         amount_eur, entry_fee_eur, adopted, quote, new_listing, time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         symbol,
         trade_data['entry_price'],
@@ -62,6 +64,8 @@ def save_trade(symbol, trade_data):
         trade_data['amount_eur'],
         trade_data.get('entry_fee_eur', 0.0),
         1 if trade_data.get('adopted') else 0,
+        trade_data.get('quote', 'EUR'),
+        1 if trade_data.get('new_listing') else 0,
         trade_data['time'],
     ))
     conn.commit()
@@ -78,7 +82,7 @@ def load_trades():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT symbol, entry_price, current_price, highest_price, amount_base,
-               amount_eur, entry_fee_eur, adopted, time
+               amount_eur, entry_fee_eur, adopted, quote, new_listing, time
         FROM open_trades
     """)
     rows = cursor.fetchall()
@@ -94,8 +98,10 @@ def load_trades():
             "amount_eur": r[5],
             "entry_fee_eur": r[6] or 0.0,
             "adopted": bool(r[7]),
+            "quote": r[8] or 'EUR',
+            "new_listing": bool(r[9]),
             "pnl_pct": 0.0,
-            "time": r[8],
+            "time": r[10],
         }
     return trades
 
