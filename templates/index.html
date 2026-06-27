@@ -82,9 +82,38 @@
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
+        }
+
+        .mode-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+            border: 1px solid var(--glass-border);
+        }
+        .mode-live { background: rgba(239,68,68,0.12); color: var(--danger); border-color: var(--danger); }
+        .mode-sim { background: rgba(59,130,246,0.12); color: var(--accent); border-color: var(--accent); }
+
+        .cb-banner {
+            display: none;
+            width: 100%;
+            margin-bottom: 16px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            background: rgba(239,68,68,0.12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            font-weight: 600;
+            text-align: center;
+        }
+        .fee-note {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: -6px;
+            margin-bottom: 16px;
         }
 
         .metric-card {
@@ -193,6 +222,7 @@
         <div class="controls">
             <button class="btn-start" onclick="fetch('/api/start')">▶ Avvia Bot</button>
             <button class="btn-stop" onclick="fetch('/api/stop')">■ Ferma Bot</button>
+            <div id="modeBadge" class="mode-badge">--</div>
             <div id="statusIndicator" class="status-badge">ONLINE</div>
         </div>
     </header>
@@ -200,6 +230,7 @@
     <div class="container">
         
         <div class="main-content">
+            <div id="cbBanner" class="cb-banner">⏸ Circuit Breaker attivo</div>
             <div class="glass-panel">
                 <div class="metrics-grid">
                     <div class="metric-card">
@@ -207,14 +238,19 @@
                         <div class="metric-value" id="balance">€0.00</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-title">Profitto Netto</div>
+                        <div class="metric-title">Profitto Netto (post-fee)</div>
                         <div class="metric-value" id="profit">€0.00</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Fee Totali Pagate</div>
+                        <div class="metric-value" id="fees">€0.00</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Operazioni (Vinte/Perse)</div>
                         <div class="metric-value" id="winrate">0 / 0</div>
                     </div>
                 </div>
+                <div class="fee-note" id="feeNote">Fee/lato: -- % · Breakeven lordo richiesto: -- %</div>
             </div>
 
             <div class="glass-panel">
@@ -268,14 +304,38 @@
                     statusBadge.style.animation = "none";
                 }
 
+                // Badge modalita' (LIVE / SIMULATION)
+                const modeBadge = document.getElementById('modeBadge');
+                if (data.mode) {
+                    modeBadge.innerText = data.mode;
+                    modeBadge.className = 'mode-badge ' + (data.mode === 'LIVE' ? 'mode-live' : 'mode-sim');
+                }
+
+                // Banner Circuit Breaker
+                const cbBanner = document.getElementById('cbBanner');
+                if (data.circuit_breaker_active) {
+                    cbBanner.style.display = 'block';
+                    cbBanner.innerText = `⏸ Circuit Breaker attivo — ripresa tra ~${data.circuit_breaker_minutes} min`;
+                } else {
+                    cbBanner.style.display = 'none';
+                }
+
                 // Aggiorna Metriche
                 document.getElementById('balance').innerText = `€${data.balance.toFixed(2)}`;
-                
+
                 const profitEl = document.getElementById('profit');
                 profitEl.innerText = `€${data.total_profit.toFixed(2)}`;
                 profitEl.className = 'metric-value ' + (data.total_profit >= 0 ? 'text-green' : 'text-red');
 
+                if (typeof data.total_fees === 'number') {
+                    document.getElementById('fees').innerText = `€${data.total_fees.toFixed(2)}`;
+                }
                 document.getElementById('winrate').innerText = `${data.win_rate.wins} / ${data.win_rate.losses}`;
+
+                if (typeof data.fee_rate_pct === 'number') {
+                    document.getElementById('feeNote').innerText =
+                        `Fee/lato: ${data.fee_rate_pct}% · Breakeven lordo richiesto: ${data.breakeven_pct}%`;
+                }
 
                 // Aggiorna Posizioni Aperte
                 const posTable = document.getElementById('positionsTable');
@@ -305,8 +365,8 @@
                 logContainer.innerHTML = '';
                 data.logs.forEach(line => {
                     let color = "";
-                    if(line.includes("TAKE PROFIT") || line.includes("SEGNALE")) color = "text-green";
-                    if(line.includes("STOP LOSS") || line.includes("Errore")) color = "text-red";
+                    if(line.includes("PROFITTO") || line.includes("SEGNALE") || line.includes("TREND REVERSAL")) color = "text-green";
+                    if(line.includes("STOP LOSS") || line.includes("PERDITA") || line.includes("Errore") || line.includes("CIRCUIT BREAKER")) color = "text-red";
                     logContainer.innerHTML += `<div class="log-line ${color}">${line}</div>`;
                 });
 

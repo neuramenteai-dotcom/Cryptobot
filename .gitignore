@@ -1,5 +1,18 @@
+# Secrets / credentials
 .env
+.env.*
+!.env.example
+*.json
+cdp_api_key*.json
+
+# Local state / database
+*.db
+bot_state.db
+bot_log.txt
+
+# Python
 __pycache__/
 *.pyc
-bot_log.txt
+
+# Editor
 .vscode/

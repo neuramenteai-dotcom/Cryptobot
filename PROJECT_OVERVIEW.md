@@ -30,10 +30,15 @@ Un bot automatizzato e hostato in cloud (tramite **Render**) per fare scalping /
    - Investe una percentuale del capitale (base 5%).
    - Se la moneta ha volumi immensi (es. BTC, SOL) aggiunge un moltiplicatore, rischiando di più perché più stabile.
    - Se la moneta sta subendo un pump molto violento (>15%), aumenta la puntata per cavalcare l'onda.
-4. **Gestione dell'Uscita**:
-   - **Trend Reversal (Take Profit Dinamico)**: Appena il prezzo chiude *sotto* l'SMA, significa che l'onda rialzista si è rotta. Il bot incassa subito i profitti (o accetta una piccolissima perdita strutturale).
-   - **Hard Stop-Loss**: Fissato rigidamente (es. -1.0%). Se si verifica un crollo improvviso ("flash crash"), il bot svuota la posizione all'istante a mercato, prevenendo disastri.
-5. **Autoliquidazione**: Se il bot trova un'ottima occasione ma non ha Euro liberi, analizza il portafoglio e liquida automaticamente asset non bloccati (HODL list) per trovare la liquidità necessaria.
+4. **Gestione dell'Uscita (FEE-AWARE)**:
+   - **Calcolo netto reale**: ogni chiusura usa i proventi *reali* dell'ordine (fill effettivi) al netto delle commissioni di Coinbase su entrambi i lati. Il PnL mostrato è il guadagno netto in tasca, non lordo.
+   - **Soglia di Breakeven**: il bot NON vende in "finto profitto". Un'uscita per Trend Reversal avviene solo se il guadagno lordo supera il costo round-trip delle fee (`2 × FEE_RATE`) più un margine minimo (`MIN_NET_PROFIT_PCT`). Sotto quella soglia mantiene la posizione.
+   - **Trailing Stop**: esce quando il prezzo scende di `STOP_LOSS_PCT` (default 1.5%) rispetto al picco massimo. Se in profitto incassa, altrimenti taglia la perdita.
+   - **Vendita verificata**: balance e statistiche vengono aggiornati solo DOPO conferma del fill reale. Se l'ordine fallisce, la posizione resta tracciata (niente posizioni orfane).
+5. **Autoliquidazione (sicura)**: se mancano Euro liberi, liquida asset non bloccati — MAI gli HODL (`BLOCKED_ASSETS`) né le posizioni aperte gestite dal bot.
+6. **Persistenza & Sicurezza**: circuit breaker (3 perdite consecutive → pausa 30 min), statistiche, profitto e fee totali sopravvivono ai riavvii del worker (tabella `bot_meta` su SQLite). Stato condiviso protetto da lock per evitare race condition con la dashboard.
+
+> **Commissioni**: configurabili via env `FEE_RATE` (default 0.006 = 0.6% per lato, taker). Il breakeven lordo richiesto è quindi ~1.6%. Tarare `FEE_RATE` sul proprio tier fee Coinbase reale.
 
 ## 🚀 Setup e Manutenzione Futura
 Per chi prenderà in mano il codice in futuro:
