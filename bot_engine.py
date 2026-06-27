@@ -74,8 +74,7 @@ class TradingBot:
 
         # Known markets (per new-listing detection)
         try:
-            km = database.get_meta('known_markets', '')
-            self.known_markets = set(json.loads(km)) if km else set()
+            self.known_markets = database.load_known_markets()
         except Exception:
             self.known_markets = set()
 
@@ -134,6 +133,7 @@ class TradingBot:
         if TRADE_MODE != "LIVE":
             self.balances = {q: 0.0 for q in self.balances}
             self.balances["EUR"] = BUDGET
+            self.balances["USDC"] = BUDGET
             return
         self._refresh_balances()
 
@@ -275,12 +275,12 @@ class TradingBot:
         current = set(current_symbols)
         if not self.known_markets:
             self.known_markets = current
-            database.set_meta('known_markets', json.dumps(sorted(current)))
+            database.save_known_markets(current)
             return
         new = current - self.known_markets
         if new:
             self.known_markets |= new
-            database.set_meta('known_markets', json.dumps(sorted(self.known_markets)))
+            database.save_known_markets(new)
             for s in new:
                 self.new_listings[s] = NEW_LISTING_MAX_AGE_CYCLES
                 self.log_msg(f"[NEW LISTING] Rilevato nuovo mercato: {s}")
@@ -307,9 +307,13 @@ class TradingBot:
 
         proceeds = fill['proceeds_eur']      # in valuta quote
         exit_fee = fill['fee_eur']           # in valuta quote
-        net_pnl_q = proceeds - pos['amount_eur']
+        
+        amount_quote = pos.get('amount_quote', pos.get('amount_eur', 0.0))
+        net_pnl_q = proceeds - amount_quote
         net_pnl_eur = self._to_eur(net_pnl_q, quote)
-        trade_fee_eur = self._to_eur(exit_fee + pos.get('entry_fee_eur', 0.0), quote)
+        
+        entry_fee = pos.get('entry_fee_eur', 0.0)
+        trade_fee_eur = self._to_eur(exit_fee + entry_fee, quote)
 
         with self.lock:
             self.open_positions.pop(sym, None)
@@ -330,9 +334,24 @@ class TradingBot:
                 if self.consecutive_losses >= 3:
                     self.circuit_breaker_until = time.time() + (CIRCUIT_BREAKER_MINUTES * 60)
                     self.log_msg("[CIRCUIT BREAKER] 3 perdite consecutive. Pausa di emergenza attivata.")
+                    database.log_circuit_breaker(f"3 perdite consecutive. Stop attivato per {sym}", self.consecutive_losses)
             self._persist_state()
 
-        database.remove_trade(sym)
+        database.archive_trade(
+            symbol=sym,
+            entry_price=pos.get('entry_price', 0),
+            exit_price=fill.get('avg_price', pos.get('current_price', 0)),
+            highest_price=pos.get('highest_price'),
+            amount_base=pos['amount_base'],
+            amount_quote=amount_quote,
+            pnl_eur=net_pnl_eur,
+            entry_fee=entry_fee,
+            exit_fee=exit_fee,
+            fee_currency=quote,
+            quote=quote,
+            close_reason=reason,
+            opened_at=pos.get('opened_at', pos.get('time', ''))
+        )
         self.log_msg(f"[{reason}] {sym} chiusa -> {tag} NETTO €{net_pnl_eur:+.2f} "
                      f"(fee €{trade_fee_eur:.2f}). Tot EUR: €{self.total_balance_eur():.2f}")
         return True
@@ -606,9 +625,10 @@ class TradingBot:
 
         trade_data = {
             "entry_price": entry_price, "current_price": entry_price, "highest_price": entry_price,
-            "amount_base": filled_base, "amount_eur": cost, "entry_fee_eur": entry_fee,
+            "amount_base": filled_base, "amount_eur": cost, "amount_quote": cost, "amount_eur_equiv": self._to_eur(cost, quote),
+            "entry_fee_eur": entry_fee, "fee_currency": quote,
             "quote": quote, "adopted": False, "new_listing": is_new,
-            "pnl_pct": 0.0, "time": time.strftime('%H:%M:%S'),
+            "pnl_pct": 0.0, "time": time.strftime('%H:%M:%S'), "opened_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         with self.lock:
             self.open_positions[symbol] = trade_data
