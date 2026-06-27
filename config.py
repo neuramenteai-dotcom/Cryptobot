@@ -64,6 +64,13 @@ NEW_LISTING_MAX_AGE_CYCLES = int(os.getenv("NEW_LISTING_MAX_AGE_CYCLES", "60")) 
 # posizioni: rischio ridotto sugli estremi. Segnale soft, mai blocca il trading.
 MARKET_INTEL_ENABLED = _flag("MARKET_INTEL_ENABLED", True)
 
+# Fonti news gratuite:
+# - GDELT (geopolitica globale): gratuito, keyless. Misura il "rumore" di rischio
+#   (ban/regolamentazioni/hack/sanzioni) e abbassa il rischio quando e' alto.
+# - CryptoPanic (sentiment crypto per-asset): richiede chiave gratuita.
+GEOPOLITICAL_RISK_ENABLED = _flag("GEOPOLITICAL_RISK_ENABLED", True)
+CRYPTOPANIC_API_KEY = os.getenv("CRYPTOPANIC_API_KEY", "")
+
 # --- FMP radar (momentum/news) ---
 FMP_ENABLED = _flag("FMP_ENABLED", True)
 # Le news vere richiedono un piano FMP a pagamento (free = 402). Se attivo, il

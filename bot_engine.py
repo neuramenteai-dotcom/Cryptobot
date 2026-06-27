@@ -219,6 +219,8 @@ class TradingBot:
                 "fear_greed": self._regime.get("fear_greed"),
                 "fear_greed_label": self._regime.get("fear_greed_label", ""),
                 "risk_multiplier": self._regime.get("risk_multiplier", 1.0),
+                "geopolitical_risk": self._regime.get("geopolitical_risk"),
+                "geo_samples": self._regime.get("geo_samples", []),
                 "enabled_quotes": ENABLED_QUOTES,
                 "new_listings": list(self.new_listings.keys()),
                 "circuit_breaker_active": cb_active,
@@ -618,11 +620,12 @@ class TradingBot:
                 break
 
     def _fmp_ok(self, base):
-        """Soft filter FMP: blocca solo se il sentiment news e' chiaramente negativo."""
-        if not FMP_ENABLED:
+        """Soft filter news: blocca solo se il sentiment (FMP o CryptoPanic) e'
+        chiaramente negativo. Passa per l'aggregatore market_intel."""
+        if not (FMP_ENABLED or MARKET_INTEL_ENABLED):
             return True
         try:
-            sig = self.fmp.get_signal(base)
+            sig = self.intel.get_asset_signal(base)
             sent = sig.get('news_sentiment')
             if sent is not None and sent < -0.5:
                 return False

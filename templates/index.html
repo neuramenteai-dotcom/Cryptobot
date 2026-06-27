@@ -431,8 +431,13 @@
                         `Quote attive: ${data.enabled_quotes.join(', ')} · Nuove listing: ${nl}`;
                 }
                 if (data.fear_greed != null) {
+                    let geo = '';
+                    if (data.geopolitical_risk != null) {
+                        const lvl = data.geopolitical_risk >= 0.5 ? '⚠️ ALTO' : (data.geopolitical_risk >= 0.25 ? 'medio' : 'basso');
+                        geo = ` · rischio news: ${lvl} (${data.geopolitical_risk})`;
+                    }
                     document.getElementById('marketNote').innerText =
-                        `Regime mercato: ${data.market_regime} · Fear&Greed ${data.fear_greed} (${data.fear_greed_label}) · rischio x${data.risk_multiplier}`;
+                        `Regime mercato: ${data.market_regime} · Fear&Greed ${data.fear_greed} (${data.fear_greed_label}) · rischio x${data.risk_multiplier}${geo}`;
                 } else {
                     document.getElementById('marketNote').innerText = `Regime mercato: dati non disponibili`;
                 }
