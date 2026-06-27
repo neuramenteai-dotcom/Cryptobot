@@ -231,6 +231,7 @@
         
         <div class="main-content">
             <div id="cbBanner" class="cb-banner">⏸ Circuit Breaker attivo</div>
+            <div id="trialBanner" class="cb-banner" style="background:rgba(59,130,246,0.12);border-color:var(--accent);color:#93c5fd;"></div>
             <div class="glass-panel">
                 <div class="metrics-grid">
                     <div class="metric-card">
@@ -327,6 +328,30 @@
                     cbBanner.innerText = `⏸ Circuit Breaker attivo — ripresa tra ~${data.circuit_breaker_minutes} min`;
                 } else {
                     cbBanner.style.display = 'none';
+                }
+
+                // Banner prova gratuita Coinbase One (countdown + verdetto)
+                const tb = document.getElementById('trialBanner');
+                if (data.coinbase_one && typeof data.trial_days_left === 'number') {
+                    const d = data.trial_days_left;
+                    const net = (typeof data.total_profit === 'number') ? data.total_profit : 0;
+                    let verdict;
+                    if (net >= data.subscription_cost) verdict = `il bot ha generato €${net.toFixed(2)} ≥ €${data.subscription_cost} → conviene tenerlo`;
+                    else verdict = `profitto €${net.toFixed(2)} < €${data.subscription_cost}/mese → valuta la DISATTIVAZIONE prima dell'addebito`;
+                    if (d > 0) {
+                        tb.style.display = 'block';
+                        tb.innerText = `🎁 Prova Coinbase One gratuita: ancora ${d} giorn${d===1?'o':'i'} (fino al ${data.trial_end}) — ${verdict}`;
+                    } else if (d === 0) {
+                        tb.style.display = 'block';
+                        tb.innerText = `⚠️ Prova Coinbase One: ULTIMO GIORNO (${data.trial_end}) — ${verdict}`;
+                    } else {
+                        tb.style.display = 'block';
+                        tb.style.borderColor = 'var(--danger)';
+                        tb.style.color = '#fca5a5';
+                        tb.innerText = `💳 Coinbase One a pagamento (€${data.subscription_cost}/mese) dal ${data.trial_end} — ${verdict}`;
+                    }
+                } else {
+                    tb.style.display = 'none';
                 }
 
                 // Aggiorna Metriche

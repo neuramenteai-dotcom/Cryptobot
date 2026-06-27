@@ -5,7 +5,7 @@ import threading
 from config import (
     TRADE_MODE, BUDGET, STOP_LOSS_PCT, MIN_NET_PROFIT_PCT, FEE_RATE, MIN_GAINER_PCT,
     BLOCKED_ASSETS, ENABLED_QUOTES, STABLE_QUOTES,
-    COINBASE_ONE, COINBASE_ONE_MONTHLY_COST, FREE_FEE_ALLOWANCE,
+    COINBASE_ONE, COINBASE_ONE_MONTHLY_COST, FREE_FEE_ALLOWANCE, COINBASE_ONE_TRIAL_END,
     DUST_CLEANUP_ENABLED, DUST_MAX_EUR, DUST_MIN_SELLABLE_EUR,
     NEW_LISTING_ENABLED, NEW_LISTING_TRADE_EUR, NEW_LISTING_MAX_AGE_CYCLES,
     FMP_ENABLED,
@@ -187,6 +187,12 @@ class TradingBot:
             cb_minutes = int((self.circuit_breaker_until - time.time()) / 60) if cb_active else 0
             eff_fee = self.effective_fee_rate()
             net_profit_after_sub = self.total_profit - (COINBASE_ONE_MONTHLY_COST if COINBASE_ONE else 0)
+            trial_days_left = None
+            try:
+                end = datetime.datetime.strptime(COINBASE_ONE_TRIAL_END, "%Y-%m-%d").date()
+                trial_days_left = (end - datetime.date.today()).days
+            except Exception:
+                trial_days_left = None
             return {
                 "running": self.running,
                 "mode": TRADE_MODE,
@@ -203,6 +209,8 @@ class TradingBot:
                 "monthly_volume": round(self.monthly_volume, 2),
                 "free_allowance_left": round(self.free_allowance_left(), 2),
                 "subscription_cost": COINBASE_ONE_MONTHLY_COST if COINBASE_ONE else 0,
+                "trial_end": COINBASE_ONE_TRIAL_END,
+                "trial_days_left": trial_days_left,
                 "enabled_quotes": ENABLED_QUOTES,
                 "new_listings": list(self.new_listings.keys()),
                 "circuit_breaker_active": cb_active,
