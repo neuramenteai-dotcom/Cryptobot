@@ -421,7 +421,7 @@ class TradingBot:
                                 "changesPercentage": pct_change, "volume": volume, "is_new": False})
         # nuove listing in cima, poi per momentum
         gainers.sort(key=lambda x: (x["is_new"], x["changesPercentage"]), reverse=True)
-        return gainers
+        return gainers[:15]  # Limitiamo ai top 15 per evitare rate-limit su fetch_ohlcv
 
     def _wait(self, seconds):
         for _ in range(seconds):
@@ -541,13 +541,7 @@ class TradingBot:
                     break
                 continue
 
-            # Candidato normale: SMA + RSI/MACD + FMP
-            sma = self.executor.get_sma(symbol)
-            if sma is None or price <= sma:
-                sma_val = f"{sma:.4f}" if sma is not None else "N/A"
-                self.log_msg(f"[FILTRO] {symbol} scartato: prezzo (${price:.4f}) sotto SMA ({sma_val})")
-                continue
-
+            # 1. Verifica preliminare liquidita' (risparmia chiamate API e previene rate-limit)
             base_amount = max(MIN_ORDER, avail * 0.05)
             multiplier = 1.0
             if gainer.get('changesPercentage', 0) > 15.0:
@@ -557,7 +551,14 @@ class TradingBot:
             trade_amount = min(base_amount * multiplier, max(MIN_ORDER, avail * 0.15))
 
             if avail < trade_amount or avail < MIN_ORDER:
-                self.log_msg(f"[SKIP] {symbol}: liquidita' {quote} insufficiente ({avail:.2f})")
+                # Nessun log per evitare spam inutile per monete senza fondi sufficienti
+                continue
+
+            # 2. Candidato normale: SMA + RSI/MACD + FMP (solo se ci sono fondi)
+            sma = self.executor.get_sma(symbol)
+            if sma is None or price <= sma:
+                sma_val = f"{sma:.4f}" if sma is not None else "N/A"
+                self.log_msg(f"[FILTRO] {symbol} scartato: prezzo (${price:.4f}) sotto SMA ({sma_val})")
                 continue
 
             rsi, macd_bullish = self.executor.get_indicators(symbol)
