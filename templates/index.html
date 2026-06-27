@@ -261,6 +261,7 @@
                 </div>
                 <div class="fee-note" id="feeNote">Fee/lato: -- % · Breakeven lordo: -- %</div>
                 <div class="fee-note" id="infoNote">Quote attive: -- · Nuove listing: --</div>
+                <div class="fee-note" id="marketNote">Regime mercato: --</div>
             </div>
 
             <div class="glass-panel">
@@ -278,6 +279,49 @@
                         </thead>
                         <tbody id="positionsTable">
                             <tr><td colspan="5" style="text-align:center; color:gray">Nessuna posizione aperta al momento.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <h3 style="margin-top:0; color:var(--text-muted)">Storico Trade &amp; Performance</h3>
+                <div class="metrics-grid" style="margin-bottom:16px">
+                    <div class="metric-card">
+                        <div class="metric-title">Trade chiusi</div>
+                        <div class="metric-value" id="hTotal" style="font-size:22px">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Win rate</div>
+                        <div class="metric-value" id="hWinRate" style="font-size:22px">0%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">PnL realizzato</div>
+                        <div class="metric-value" id="hPnl" style="font-size:22px">€0.00</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Fee totali</div>
+                        <div class="metric-value" id="hFees" style="font-size:22px">€0.00</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Miglior / Peggior</div>
+                        <div class="metric-value" id="hBestWorst" style="font-size:18px">— / —</div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Asset</th>
+                                <th>Ingresso</th>
+                                <th>Uscita</th>
+                                <th>PnL netto</th>
+                                <th>Motivo</th>
+                                <th>Chiuso</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable">
+                            <tr><td colspan="6" style="text-align:center; color:gray">Nessun trade chiuso ancora.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -386,6 +430,12 @@
                     document.getElementById('infoNote').innerText =
                         `Quote attive: ${data.enabled_quotes.join(', ')} · Nuove listing: ${nl}`;
                 }
+                if (data.fear_greed != null) {
+                    document.getElementById('marketNote').innerText =
+                        `Regime mercato: ${data.market_regime} · Fear&Greed ${data.fear_greed} (${data.fear_greed_label}) · rischio x${data.risk_multiplier}`;
+                } else {
+                    document.getElementById('marketNote').innerText = `Regime mercato: dati non disponibili`;
+                }
 
                 // Aggiorna Posizioni Aperte
                 const posTable = document.getElementById('positionsTable');
@@ -425,9 +475,55 @@
             }
         }
 
-        // Aggiorna ogni 2 secondi
+        async function updateHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                const s = data.stats || {};
+                document.getElementById('hTotal').innerText = s.total_trades ?? 0;
+                document.getElementById('hWinRate').innerText = `${s.win_rate_pct ?? 0}%`;
+                const pnlEl = document.getElementById('hPnl');
+                const pnl = s.realized_pnl_eur ?? 0;
+                pnlEl.innerText = `€${pnl.toFixed(2)}`;
+                pnlEl.className = 'metric-value ' + (pnl >= 0 ? 'text-green' : 'text-red');
+                document.getElementById('hFees').innerText = `€${(s.total_fees_eur ?? 0).toFixed(2)}`;
+                document.getElementById('hBestWorst').innerText =
+                    `€${(s.best_eur ?? 0).toFixed(2)} / €${(s.worst_eur ?? 0).toFixed(2)}`;
+
+                const tbody = document.getElementById('historyTable');
+                const trades = data.trades || [];
+                if (!trades.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:gray">Nessun trade chiuso ancora.</td></tr>';
+                } else {
+                    tbody.innerHTML = '';
+                    trades.forEach(t => {
+                        const pnl = t.pnl_eur ?? 0;
+                        const cls = pnl >= 0 ? 'text-green' : 'text-red';
+                        const sign = pnl >= 0 ? '+' : '';
+                        const closed = (t.closed_at || '').replace('T', ' ').slice(5, 16);
+                        const entry = (t.entry_price != null) ? t.entry_price.toPrecision(5) : '—';
+                        const exit = (t.exit_price != null) ? t.exit_price.toPrecision(5) : '—';
+                        tbody.innerHTML += `
+                            <tr>
+                                <td style="font-weight:600">${t.symbol}</td>
+                                <td>${entry}</td>
+                                <td>${exit}</td>
+                                <td class="${cls}">${sign}€${pnl.toFixed(2)}</td>
+                                <td style="color:var(--text-muted); font-size:12px">${t.close_reason || ''}</td>
+                                <td style="color:var(--text-muted); font-size:12px">${closed}</td>
+                            </tr>`;
+                    });
+                }
+            } catch (e) {
+                console.error("Errore fetch storico:", e);
+            }
+        }
+
+        // Status ogni 2s, storico ogni 8s (meno frequente, dati pesanti)
         setInterval(updateDashboard, 2000);
+        setInterval(updateHistory, 8000);
         updateDashboard();
+        updateHistory();
     </script>
 </body>
 </html>

@@ -277,6 +277,78 @@ def save_known_markets(markets_set):
     conn.close()
 
 
+def load_trade_history(limit=50):
+    """Ritorna gli ultimi trade chiusi (piu' recenti prima)."""
+    try:
+        conn = _connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT symbol, entry_price, exit_price, pnl_eur, entry_fee, exit_fee,
+                   fee_currency, quote, close_reason, opened_at, closed_at
+            FROM trade_history ORDER BY id DESC LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        out = []
+        for r in rows:
+            out.append({
+                "symbol": r[0], "entry_price": r[1], "exit_price": r[2],
+                "pnl_eur": r[3], "fees_eur": (r[4] or 0) + (r[5] or 0),
+                "fee_currency": r[6], "quote": r[7], "close_reason": r[8],
+                "opened_at": r[9], "closed_at": r[10],
+            })
+        return out
+    except Exception:
+        return []
+
+
+def get_trade_stats():
+    """Statistiche aggregate sui trade chiusi (per analytics professionale)."""
+    try:
+        conn = _connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*),
+                   COALESCE(SUM(pnl_eur), 0),
+                   COALESCE(SUM(CASE WHEN pnl_eur >= 0 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(entry_fee + exit_fee), 0),
+                   COALESCE(AVG(pnl_eur), 0),
+                   COALESCE(MAX(pnl_eur), 0),
+                   COALESCE(MIN(pnl_eur), 0)
+            FROM trade_history
+        """)
+        total, pnl, wins, fees, avg, best, worst = cursor.fetchone()
+        conn.close()
+        losses = total - wins
+        return {
+            "total_trades": total,
+            "wins": wins,
+            "losses": losses,
+            "win_rate_pct": round((wins / total * 100), 1) if total else 0,
+            "realized_pnl_eur": round(pnl, 2),
+            "total_fees_eur": round(fees, 2),
+            "avg_pnl_eur": round(avg, 3),
+            "best_eur": round(best, 2),
+            "worst_eur": round(worst, 2),
+        }
+    except Exception:
+        return {"total_trades": 0, "wins": 0, "losses": 0, "win_rate_pct": 0,
+                "realized_pnl_eur": 0, "total_fees_eur": 0, "avg_pnl_eur": 0,
+                "best_eur": 0, "worst_eur": 0}
+
+
+def load_circuit_breaker_log(limit=10):
+    try:
+        conn = _connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT triggered_at, reason, consecutive_losses FROM circuit_breaker_log ORDER BY id DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"triggered_at": r[0], "reason": r[1], "consecutive_losses": r[2]} for r in rows]
+    except Exception:
+        return []
+
+
 def set_meta(key, value):
     conn = _connect()
     cursor = conn.cursor()

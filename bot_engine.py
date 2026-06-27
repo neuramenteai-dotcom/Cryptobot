@@ -8,10 +8,11 @@ from config import (
     COINBASE_ONE, COINBASE_ONE_MONTHLY_COST, FREE_FEE_ALLOWANCE, COINBASE_ONE_TRIAL_END,
     DUST_CLEANUP_ENABLED, DUST_MAX_EUR, DUST_MIN_SELLABLE_EUR,
     NEW_LISTING_ENABLED, NEW_LISTING_TRADE_EUR, NEW_LISTING_MAX_AGE_CYCLES,
-    FMP_ENABLED,
+    FMP_ENABLED, MARKET_INTEL_ENABLED,
 )
 from coinbase_executor import CoinbaseExecutor
 from fmp_radar import FmpRadar
+from market_intel import MarketIntel
 import database
 
 COOLDOWN_MINUTES = 30
@@ -24,6 +25,9 @@ class TradingBot:
     def __init__(self):
         self.executor = CoinbaseExecutor()
         self.fmp = FmpRadar()
+        self.intel = MarketIntel()
+        self._regime = {"available": False, "risk_multiplier": 1.0, "regime": "unknown",
+                        "fear_greed": None, "fear_greed_label": ""}
         self.running = False
         self.logs = []
         self.lock = threading.RLock()
@@ -211,6 +215,10 @@ class TradingBot:
                 "subscription_cost": COINBASE_ONE_MONTHLY_COST if COINBASE_ONE else 0,
                 "trial_end": COINBASE_ONE_TRIAL_END,
                 "trial_days_left": trial_days_left,
+                "market_regime": self._regime.get("regime", "unknown"),
+                "fear_greed": self._regime.get("fear_greed"),
+                "fear_greed_label": self._regime.get("fear_greed_label", ""),
+                "risk_multiplier": self._regime.get("risk_multiplier", 1.0),
                 "enabled_quotes": ENABLED_QUOTES,
                 "new_listings": list(self.new_listings.keys()),
                 "circuit_breaker_active": cb_active,
@@ -396,6 +404,14 @@ class TradingBot:
                 self._refresh_balances()
                 self._detect_new_listings(tickers.keys())
 
+                # Regime di mercato (Fear&Greed): scala il rischio del sizing
+                if MARKET_INTEL_ENABLED:
+                    self._regime = self.intel.get_regime()
+                    if self._regime.get("available"):
+                        self.log_msg(f"[MERCATO] Fear&Greed {self._regime['fear_greed']} "
+                                     f"({self._regime['fear_greed_label']}) -> regime {self._regime['regime']}, "
+                                     f"rischio x{self._regime['risk_multiplier']}")
+
                 gainers = self._scan_gainers(tickers)
                 if not gainers:
                     self.log_msg(f"Nessun gainer (>+{MIN_GAINER_PCT}%) sui quote {','.join(ENABLED_QUOTES)}. Attesa...")
@@ -568,6 +584,10 @@ class TradingBot:
             if gainer.get('volume', 0) > 20000000:
                 multiplier += 0.5
             trade_amount = min(base_amount * multiplier, max(MIN_ORDER, avail * 0.15))
+
+            # Regime di mercato: riduce la size sugli estremi (panico/euforia)
+            if MARKET_INTEL_ENABLED and self._regime.get("available"):
+                trade_amount *= self._regime.get("risk_multiplier", 1.0)
 
             if avail < trade_amount or avail < MIN_ORDER:
                 # Nessun log per evitare spam inutile per monete senza fondi sufficienti

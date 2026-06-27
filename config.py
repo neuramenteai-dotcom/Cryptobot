@@ -59,6 +59,11 @@ NEW_LISTING_ENABLED = _flag("NEW_LISTING_ENABLED", True)
 NEW_LISTING_TRADE_EUR = float(os.getenv("NEW_LISTING_TRADE_EUR", "6.0"))  # size fissa piccola, alto rischio
 NEW_LISTING_MAX_AGE_CYCLES = int(os.getenv("NEW_LISTING_MAX_AGE_CYCLES", "60"))  # quanti cicli resta "nuova"
 
+# --- Market Intelligence (Fear&Greed + regime di rischio) ---
+# Quando attivo, il regime di mercato (es. panico/euforia) scala la size delle
+# posizioni: rischio ridotto sugli estremi. Segnale soft, mai blocca il trading.
+MARKET_INTEL_ENABLED = _flag("MARKET_INTEL_ENABLED", True)
+
 # --- FMP radar (momentum/news) ---
 FMP_ENABLED = _flag("FMP_ENABLED", True)
 # Le news vere richiedono un piano FMP a pagamento (free = 402). Se attivo, il

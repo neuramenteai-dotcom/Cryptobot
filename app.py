@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify
 from bot_engine import bot_instance
+import database
 
 app = Flask(__name__)
 
@@ -15,6 +16,16 @@ def status():
     bot_instance.start()
     # Snapshot thread-safe: evita race condition con il thread del bot
     return jsonify(bot_instance.get_status_snapshot())
+
+
+@app.route('/api/history')
+def history():
+    """Storico trade chiusi + statistiche aggregate + log circuit breaker."""
+    return jsonify({
+        "stats": database.get_trade_stats(),
+        "trades": database.load_trade_history(limit=50),
+        "circuit_breaker": database.load_circuit_breaker_log(limit=10),
+    })
 
 
 @app.route('/api/start')
