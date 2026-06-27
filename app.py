@@ -10,6 +10,9 @@ def index():
 
 @app.route('/api/status')
 def status():
+    # Sicurezza per Render/Gunicorn: se il worker non ha il thread attivo, lo fa partire
+    bot_instance.start()
+    
     return jsonify({
         "running": bot_instance.running,
         "balance": round(bot_instance.current_balance, 2),

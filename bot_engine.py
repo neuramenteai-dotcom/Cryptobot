@@ -317,10 +317,15 @@ class TradingBot:
                 time.sleep(1)
 
     def start(self):
-        if not self.running:
-            self.running = True
-            threading.Thread(target=self.loop, daemon=True).start()
+        # Su Render/Gunicorn, il fork uccide i thread in background. 
+        # Controlliamo se il thread è veramente vivo in questo processo.
+        if hasattr(self, 'thread') and self.thread.is_alive():
+            return
             
+        self.running = True
+        self.thread = threading.Thread(target=self.loop, daemon=True)
+        self.thread.start()
+        
     def stop(self):
         self.running = False
         self.log_msg("Spegnimento bot richiesto...")
