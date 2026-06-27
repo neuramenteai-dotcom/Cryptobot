@@ -35,7 +35,7 @@ COINBASE_ONE_MONTHLY_COST = float(os.getenv("COINBASE_ONE_MONTHLY_COST", "5.0"))
 FREE_FEE_ALLOWANCE = float(os.getenv("FREE_FEE_ALLOWANCE", "500.0"))  # EUR/mese a fee 0
 # Fine della prova gratuita (da schermata: 4 lug 2026). Dopo questa data parte
 # l'addebito di €5/mese: la dashboard mostra il countdown e un verdetto.
-COINBASE_ONE_TRIAL_END = os.getenv("COINBASE_ONE_TRIAL_END", "2026-07-04")
+COINBASE_ONE_TRIAL_END = os.getenv("COINBASE_ONE_TRIAL_END", "2026-07-01")
 
 # Scalping Parameters
 TIMEFRAME = "5m"
