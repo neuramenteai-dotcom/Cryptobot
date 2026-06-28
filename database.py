@@ -240,6 +240,18 @@ def archive_trade(symbol, entry_price, exit_price, highest_price, amount_base, a
     conn.commit()
     conn.close()
 
+    # Persistenza cloud (Supabase): sopravvive ai riavvii del DB effimero.
+    try:
+        import cloud_store
+        cloud_store.archive_trade({
+            "symbol": symbol, "entry_price": entry_price, "exit_price": exit_price,
+            "pnl_eur": pnl_eur, "entry_fee": entry_fee, "exit_fee": exit_fee,
+            "fee_currency": fee_currency, "quote": quote, "close_reason": close_reason,
+            "opened_at": str(opened_at),
+        })
+    except Exception:
+        pass
+
 
 def log_circuit_breaker(reason, consecutive_losses):
     conn = _connect()

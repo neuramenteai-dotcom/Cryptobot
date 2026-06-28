@@ -71,6 +71,12 @@ MARKET_INTEL_ENABLED = _flag("MARKET_INTEL_ENABLED", True)
 GEOPOLITICAL_RISK_ENABLED = _flag("GEOPOLITICAL_RISK_ENABLED", True)
 CRYPTOPANIC_API_KEY = os.getenv("CRYPTOPANIC_API_KEY", "")
 
+# --- Persistenza cloud (Supabase Postgres) ---
+# Lo storico trade viene scritto anche su Supabase: sopravvive ai riavvii del
+# DB effimero di Render. Degrada in sicurezza se non configurato.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
 # --- FMP radar (momentum/news) ---
 FMP_ENABLED = _flag("FMP_ENABLED", True)
 # Le news vere richiedono un piano FMP a pagamento (free = 402). Se attivo, il
