@@ -1,56 +1,89 @@
-# CryptoBot AI - Recap Completo
+# CryptoBot AI — Recap di Sistema
 
-Questo documento è il recap definitivo del progetto **CryptoBot AI**, un sistema automatizzato di trading algoritmico (scalping e trend-following) interfacciato con **Coinbase Advanced Trade**. È progettato per essere condiviso con altri sviluppatori per far capire esattamente le logiche, l'architettura e lo stack tecnologico.
+> Ultimo aggiornamento: 1 luglio 2026. Documento pensato per essere condiviso: riassume scopo, architettura, stato live, risultati reali raccolti e i prossimi passi. Non richiede contesto esterno per essere capito.
 
 ## 🎯 1. Scopo del Progetto
-Il bot scansiona 24/7 il mercato cripto alla ricerca di opportunità di scalping a basso rischio. Opera su mercati **EUR** e **USDC**, individua le monete in forte rialzo (gainers), calcola il punto ottimale di ingresso tramite indicatori tecnici (SMA, RSI, MACD) e gestisce l'uscita proteggendo il capitale con Trailing Stop, calcolo delle fee in tempo reale (breakeven dinamico) e Circuit Breaker. Include una **Dashboard Web** in Flask per il monitoraggio in tempo reale.
+Sistema di trading algoritmico automatizzato per crypto (scalping/trend-following), interfacciato con **Coinbase Advanced Trade**, pensato per evolvere in una piattaforma multi-asset (crypto oggi, azioni USA in arrivo via Alpaca). Include dashboard web di monitoraggio in tempo reale, persistenza cloud dello storico trade, e un layer di "market intelligence" (sentiment, rischio geopolitico, regime di mercato).
 
-## 🛠 2. Stack Tecnologico e Linguaggio
+## 🟢 2. Stato Attuale — cosa gira ORA
+- **Deploy**: [Render](https://cryptobot-4k3g.onrender.com) (piano free), 1 worker Gunicorn, deploy automatico ad ogni push su `main`.
+- **Modalità**: `SIMULATION` (nessun ordine reale) — in fase di raccolta dati per validare la strategia prima di passare a `LIVE`.
+- **Persistenza**: SQLite locale (stato del bot) + **Supabase (Postgres)** per lo storico trade, che sopravvive ai riavvii/standby di Render.
+- **Uptime**: monitor esterno (UptimeRobot, ping ogni 5 min) per tenere il servizio sveglio 24/7 — necessario perché il piano Render free va in standby dopo ~15 min di inattività.
+- **Repository**: `github.com/neuramenteai-dotcom/Cryptobot`, storia git ripulita da segreti.
+
+## 🔐 3. Sicurezza
+- Chiavi API Coinbase e Render **ruotate** dopo un'esposizione accidentale iniziale; la vecchia history git contenente segreti è stata riscritta (`git filter-branch`) e il remote force-pushato.
+- `.gitignore` copre `.env*`, `*.json` (chiavi CDP), `*.db` (stato locale).
+- Nessuna chiave hardcoded nel codice: tutto passa da variabili d'ambiente (locali via `.env`, su Render via Environment Variables).
+
+## 🛠 4. Stack Tecnologico
 - **Linguaggio**: Python 3.10+
-- **Librerie Core**: 
-  - `ccxt`: Per comunicare con le API di Coinbase Advanced Trade tramite chiavi CDP (Coinbase Developer Platform).
-  - `Flask` & `Gunicorn`: Per la web dashboard in ascolto sulla porta 5000.
-  - `sqlite3` (built-in): Per la persistenza dello stato (trades aperti, statistiche, fee pagate).
-- **Hosting Target**: Render (o simili servizi PaaS Docker-based).
-- **Repository**: Git standard, deploy automatico.
+- **Librerie core**: `ccxt` (Coinbase Advanced Trade via chiavi CDP), `Flask`/`Gunicorn` (dashboard web), `sqlite3` (stato locale), `requests` (integrazioni HTTP dirette con FMP, GDELT, CryptoPanic, Supabase, Alpaca).
+- **Hosting**: Render (bot + dashboard), Supabase (persistenza cloud), GitHub (repo + deploy trigger).
 
-## 📂 3. Struttura del Progetto (Architettura)
+## 📂 5. Architettura — file principali
+| File | Ruolo |
+|---|---|
+| `bot_engine.py` | Motore principale: loop in thread separato, gestione posizioni, position sizing, circuit breaker, dust cleanup, new-listing detection |
+| `coinbase_executor.py` | Wrapper `ccxt`: ordini a mercato, calcolo fee reali dai fill, SMA/RSI/MACD |
+| `brokers.py` | **Astrazione broker**: interfaccia comune per estendere il bot oltre Coinbase. `CoinbaseBroker` pronto; `AlpacaBroker` pronto per paper trading su azioni USA (ordini asincroni con polling fill) |
+| `market_intel.py` | Aggregatore intelligence: Fear&Greed Index, rischio geopolitico (GDELT, gratuito), sentiment per-asset (FMP momentum + CryptoPanic) |
+| `fmp_radar.py` | Client Financial Modeling Prep (API "stable"): momentum gratuito, news a pagamento (non attivo) |
+| `cloud_store.py` | Persistenza storico trade su Supabase (best-effort, degrada in sicurezza se non configurato) |
+| `database.py` | SQLite locale: posizioni aperte, stato persistente (circuit breaker, statistiche, fee), storico trade |
+| `app.py` + `templates/index.html` | Dashboard Flask: stato live, storico trade, metriche performance |
+| `config.py` | Tutti i parametri via env var (fee, soglie rischio, quote abilitate, feature flag) |
 
-- **`bot_engine.py` (Il Motore Principale)**: Esegue il ciclo infinito (loop) in un thread separato. Gestisce le posizioni (Stop Loss/Trailing), scansiona i gainers, valuta le entrate, e gestisce routine come l'autoliquidazione (Dust Cleanup) e il Circuit Breaker.
-- **`coinbase_executor.py` (Le Mani)**: Wrapper su `ccxt`. Effettua ordini a mercato (Buy/Sell), recupera grafici a candele (OHLCV) ed espone le metriche (SMA, RSI, MACD calcolati tramite `utils.py`). Implementa un robusto mock system per eseguire la modalità simulazione senza chiamate reali e rate-limiting handling.
-- **`fmp_radar.py` (Gli Occhi sulle News)**: Interroga le API di Financial Modeling Prep (FMP) per scaricare il sentiment sulle notizie di mercato. Funge da filtro soft per evitare l'acquisto di monete con recenti notizie disastrose.
-- **`app.py` & `templates/index.html` (L'Interfaccia)**: Server Flask che espone la UI Web con design moderno e premium. Legge lo stato thread-safe da `bot_engine.py` e aggiorna la UI ogni secondo tramite polling AJAX (`/api/status`).
-- **`database.py` (La Memoria)**: Interazione diretta con `bot_state.db` (SQLite). Salva i trade attivi in caso di crash e persiste metriche chiave come `total_profit`, `consecutive_losses`, fee pagate, win rate e volume scambiato nel mese per Coinbase One.
-- **`config.py` e `.env` (Le Regole)**: Mappatura centralizzata delle variabili d'ambiente (chiavi API, BUDGET, soglie di rischio, percentuali indicatori).
+## 🧠 6. Logica di Trading
 
-## 🧠 4. Regole di Trading e Logiche nel Dettaglio
+**Ingresso** (tutte le condizioni devono valere):
+1. Asset in crescita ≥ soglia configurabile (default +2%) con volume rilevante
+2. Prezzo sopra SMA a 10 periodi (conferma trend)
+3. RSI < 70 (evita ipercomprato)
+4. MACD rialzista
+5. Sentiment news non negativo (FMP/CryptoPanic, filtro soft)
+6. Position sizing dinamico: 5% base del capitale, scalato su volume/momentum, cap al 15% per posizione
 
-### A. Pre-Filtro e Ottimizzazione
-1. **Multi-Quote (EUR & USDC)**: Il bot scansiona sia i mercati `/EUR` che `/USDC` (centinaia di mercati potenziali).
-2. **Hard-Cap & Controllo Liquidità**: Per evitare di infrangere i Rate-Limit API di Coinbase (`fetch_ohlcv`), il bot filtra preventivamente le monete per cui l'utente *non ha liquidità disponibile* (es. salta tutti gli USDC se il wallet ha solo EUR). Dopodiché, calcola gli indicatori pesanti solo sui **Top 15 Gainers** assoluti.
-3. **New Listings Detection**: Il bot memorizza in database l'elenco dei mercati conosciuti. Se rileva un mercato *appena listato*, lo attacca istantaneamente con una puntata piccola fissa (Risk Capital) per speculare sul pump iniziale, bypassando volutamente gli indicatori storici.
+**Uscita**:
+- **Trailing stop** dinamico dal picco massimo raggiunto
+- **Trend reversal** con **breakeven dinamico**: vende solo se il guadagno lordo copre le fee reali misurate + margine (mai vendita in "finto profitto")
+- **Circuit breaker**: 3 perdite consecutive → pausa 30 minuti
 
-### B. Condizioni di Ingresso (Candidati Normali)
-Affinché il bot piazzi un ordine `Market Buy`, TUTTE queste regole devono essere verificate contemporaneamente:
-1. **Performance**: L'asset deve crescere di almeno `MIN_GAINER_PCT` (default +2.0%) con volumi rilevanti (> 100k).
-2. **SMA (Media Mobile)**: Il prezzo attuale deve essere al di sopra della SMA a 10 periodi (su candele a 5 min). È la conferma di uptrend primario.
-3. **RSI**: Deve essere `< 70`. Evita acquisti all'apice di un pump esplosivo per non rischiare l'ipercomprato.
-4. **MACD**: Deve indicare momentum rialzista (MACD Line > Signal Line & Istogramma > 0).
-5. **FMP Sentiment**: Non deve esserci un sentiment news pesantemente negativo (`< -0.5`).
-6. **Position Sizing Dinamico**: Il bot non investe tutto il budget in un singolo asset. Calcola quanto investire partendo dal 5% del portafoglio (nella valuta base), scalando con moltiplicatori positivi se la moneta ha volumi immensi (sicurezza) o un pump > 15% (momentum), fino a un massimo del 15% per posizione.
+**Multi-quote**: scansiona sia mercati `/EUR` (35) che `/USDC` (~550), ampliando enormemente l'universo investibile.
 
-### C. Gestione Posizioni (Uscita) e Protezione
-1. **Trailing Stop Dinamico**: Il bot traccia costantemente il picco massimo (`highest_price`) raggiunto dalla moneta dopo l'acquisto. Se il prezzo ritraccia di `STOP_LOSS_PCT` (default 1.5%) dal picco, piazza un ordine di `Market Sell`. Se l'asset era salito, si esce in netto profitto.
-2. **Trend Reversal (SMA) & Breakeven Dinamico**: Se il prezzo buca a ribasso la SMA, il bot vende MA SOLO SE il PnL netto in quel momento copre ampiamente le commissioni di round-trip (compra + vendi) registrate. Il bot non chiude trade orizzontali in perdita per colpa delle fee.
-3. **Auto-calibrazione Commissioni (Fee Aware)**: Il bot non stima semplicemente le fee a 0.6%. Legge i payload dei fill reali da `ccxt` calcolando la spesa EUR esatta e creando un `effective_fee_rate`. Se l'utente ha un abbonamento *Coinbase One*, le fee calano automaticamente e il breakeven si abbassa, aumentando vertiginosamente le finestre di uscita utili.
-4. **Circuit Breaker (Il Freno a Mano)**: Se il bot chiude in perdita 3 trade consecutivi, blocca forzatamente tutte le scansioni di ingresso per 30 minuti, dando tempo alle medie mobili a 5m (6 candele) di stabilizzarsi dopo un flash crash, prevenendo il wipeout dell'account per revenge-trading.
-5. **Dust Cleanup**: Ad ogni riavvio o ciclo lungo, cerca rimasugli di monete (polveri) invendute, e se convertibili (sopra al minimo d'ordine), le auto-liquida per liberare liquidità, preservando rigorosamente gli asset protetti (`BLOCKED_ASSETS`).
+**Fee auto-calibrate**: il bot non assume una fee fissa — la misura dai fill reali di ogni ordine, e adatta il breakeven di conseguenza (rilevante per capire se Coinbase One azzera davvero le fee su Advanced Trade).
 
-## 🔄 5. Esecuzione e Test
-Per eseguire l'app localmente (avvia sia Dashboard web che Engine in parallelo):
+## 📊 7. Risultati Reali Raccolti (onesto, dati persistenti Supabase)
+
+Campione simulazione, **28 giugno → 1 luglio 2026** (~72 ore):
+
+| Metrica | Valore |
+|---|---|
+| Trade chiusi | 30 |
+| Win rate | **3.3%** (1 vinto / 29 persi) |
+| PnL netto | **−€3.40** |
+| Fee totali | €1.87 |
+| PnL lordo stimato | **−€1.53** |
+
+**Verdetto onesto**: l'infrastruttura funziona correttamente (persistenza, deploy, dashboard, tutto verificato), ma **la strategia sta perdendo anche al lordo delle fee** in questo campione. Il mercato è rimasto per gran parte del periodo in regime di **"panico estremo"** (Fear&Greed Index ~12-15): comprare breakout di momentum in un mercato in caduta produce sistematicamente falsi segnali seguiti da stop loss. Il bot al momento **non distingue il regime di mercato per decidere se operare**, solo per scalare la size — è il gap principale da chiudere prima di considerare capitale reale.
+
+## 🚧 8. Prossimi Passi (roadmap aperta)
+1. **Bloccare nuovi ingressi in regime di panico/falling knife** (oggi riduce solo la size, non blocca) — proposto, non ancora implementato.
+2. **Filtro liquidità più severo** sui mercati USDC micro-cap, dove avvengono i falsi breakout osservati.
+3. **Alpaca (azioni USA)**: codice pronto (`AlpacaBroker`), in attesa delle chiavi paper trading dell'utente per il primo test end-to-end.
+4. **CryptoPanic**: integrazione pronta, in attesa del token API gratuito (sito momentaneamente non raggiungibile al tentativo).
+5. Continuare la raccolta dati in simulazione fino a un campione statisticamente più robusto prima di qualunque passaggio a `LIVE`.
+
+## 🔄 9. Esecuzione Locale
 ```bash
-python app.py
+python app.py          # Dashboard + bot engine (thread separato)
+python sim_runner.py   # Runner di sola simulazione, forza SIMULATION indipendentemente da .env
 ```
-Per modificare la modalità operativa, modificare il `.env`:
-- `TRADE_MODE="SIMULATION"` -> Le chiamate REST per gli acquisti/vendite sono mockate, l'API gira in read-only.
-- `TRADE_MODE="LIVE"` -> Vengono utilizzati soldi veri, le fee vengono misurate sul fill Coinbase.
+Modalità operativa (`.env` o env Render):
+- `TRADE_MODE=SIMULATION` → ordini mockati, letture in tempo reale, zero rischio
+- `TRADE_MODE=LIVE` → ordini reali, fee misurate sui fill Coinbase — **da non attivare finché la strategia non mostra un edge positivo lordo**
+
+## 🔗 Link
+- Dashboard live: https://cryptobot-4k3g.onrender.com
+- Repository: https://github.com/neuramenteai-dotcom/Cryptobot
