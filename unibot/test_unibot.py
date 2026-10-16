@@ -1013,6 +1013,13 @@ def test_etf_lab():
     wy, wr = E.worst_calendar_year(col, ds)
     check("etf: anno peggiore = 2005 (-30%), primo e ultimo anno esclusi", wy == "2005" and abs(wr + 0.30) < 1e-9)
     eq, tr, inv = __import__("unibot.trend_lab", fromlist=["x"]).run_weights(W, P, 0.001)
+    flat = np.array([1.0] * 300)
+    r0 = E.rolling_vs_cash(flat, 1, 0.025)
+    check("etf: capitale fermo = sempre peggio del deposito, mai in perdita", r0["below_cash"] == 1.0 and r0["loss"] == 0.0 and r0["worst"] == 0.0)
+    gr = np.cumprod(np.full(600, 1.0005))
+    r1 = E.rolling_vs_cash(gr, 1, 0.025)
+    check("etf: crescita 0,05%/giorno batte il deposito in ogni finestra", r1["below_cash"] == 0.0 and abs(r1["median"] - (1.0005 ** 252 - 1)) < 1e-6)
+    check("etf: finestra piu' lunga della storia = None", E.rolling_vs_cash(flat, 5, 0.025) is None)
     check("etf: costo applicato solo all'ingresso", tr == 1 and eq[-1] < up[-1] / up[0] * 1.0)
 
 
