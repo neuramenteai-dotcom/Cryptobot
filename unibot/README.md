@@ -75,3 +75,8 @@ Rendimento del giorno dopo un movimento > ±1% / ±2% (chiusura-chiusura). SPY/Q
 60 monete in 8 settori, 2023-2026. Nel 2023-24 i settori piccoli (L2, AI, meme, DeFi) battono BTC di molto; nel 2025 tutti perdono 60-80% (BTC -5%); nel 2026 nessuno guadagna.
 Seguire il settore leader a 90 giorni: +110% nel 2023-24, -36% nel 2025-26 (BTC compra e tieni: +458% e -13%). La leadership si ripete poco (correlazione di rango +0,11, t=1,6).
 Flussi (TVL, DefiLlama): a 1 anno crescono solo Near (+61%), Base (+26%), Optimism (+25%); Ethereum -41%, Solana -47%, Sui -75%.
+
+## Compra il ribasso e dashboard (2026-10-16)
+`--dip-lab`: su BTC (dal 2014), ETH/BNB/XRP/SOL. Compra a -30..-60% dal massimo a 365 giorni, vendi a -10..-30%: su BTC +83..+207% in 12 anni contro +17.710% di compra e tieni
+(+15.229% col trend SMA200, calo massimo -71% invece di -83%). Il trend SMA200 e' l'unica regola che regge su BTC/ETH/SOL; su XRP e BNB nessuna batte compra e tieni.
+`--dashboard-data`: scrive le tabelle JSON per la dashboard (Artifact, snapshot) in `unibot_data/dashboard/`; si rigenerano e ricaricano quando si vuole aggiornarla.

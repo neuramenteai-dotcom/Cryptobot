@@ -73,6 +73,8 @@ def main(argv=None):
     ap.add_argument("--etf-forward", action="store_true", help="test in avanti (paper) della regola fissa trend SPY+QQQ")
     ap.add_argument("--forward-out", metavar="CARTELLA", default=None, help="con --etf-forward: scrive latest.md/state.json (uso in cloud)")
     ap.add_argument("--sector-lab", action="store_true", help="settori crypto: crescita per anno, persistenza, flussi di capitale")
+    ap.add_argument("--dip-lab", action="store_true", help="compra il ribasso / vendi vicino al massimo su BTC, ETH, BNB, XRP, SOL (dal 2014)")
+    ap.add_argument("--dashboard-data", action="store_true", help="scrive le tabelle JSON per la dashboard in unibot_data/dashboard")
     ap.add_argument("--quarters", default=None, help="es. 2025q1,2025q2 (default: 2025q1..2026q3)")
     ap.add_argument("--reset", action="store_true")
     ap.add_argument("--yes", action="store_true")
@@ -123,6 +125,12 @@ def main(argv=None):
     if a.trend_lab:
         from . import trend_lab
         return trend_lab.main_cli()
+    if a.dashboard_data:
+        from . import dashboard
+        return dashboard.main_cli()
+    if a.dip_lab:
+        from . import dip_lab
+        return dip_lab.main_cli()
     if a.sector_lab:
         from . import sector_lab
         return sector_lab.main_cli()

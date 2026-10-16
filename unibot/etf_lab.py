@@ -176,7 +176,8 @@ def rolling_vs_cash(eq, years, cash_rate=0.025, ppy=PPY):
             "loss": float((ann < 0).mean())}
 
 
-def vs_cash_report(syms, dates, P, cost=0.003, cash_rate=0.025):
+def vs_cash_rows(syms, dates, P, cost=0.003, cash_rate=0.025):
+    """Righe strutturate: per strategia e orizzonte, quota di finestre peggiori del deposito, mediana, caso peggiore."""
     strat, bench = strategies(syms, P)
     c = {s: i for i, s in enumerate(syms)}
     two = np.zeros(P.shape)
@@ -185,11 +186,18 @@ def vs_cash_report(syms, dates, P, cost=0.003, cash_rate=0.025):
     two = two * 0.5
     sel = {"S&P 500 compra e tieni": bench["acquista-e-tieni SPY"], "trend S&P 500 SMA200": strat["trend SPY SMA200"],
            "regola in test: 50% SPY+50% QQQ, SMA200": two, "60% SPY / 40% obbligazioni": bench["60% SPY / 40% AGG (mensile)"]}
-    out = ["CONFRONTO CON UN DEPOSITO AL %.1f%% annuo, finestre mobili (costo %.2f%% a lato), %s -> %s" % (cash_rate * 100, cost * 100, dates[0], dates[-1]),
-           "%-42s %-4s | %-14s %-10s %-10s %-10s" % ("strategia", "anni", "peggio deposito", "in perdita", "mediana", "caso peggiore")]
+    rows = []
     for name, W in sel.items():
         eq, _, _ = T.run_weights(W, P, cost)
         for y in (1, 3, 5):
             r = rolling_vs_cash(eq, y, cash_rate)
-            out.append("%-42s %-4d | %13.0f%% %9.0f%% %+9.1f%% %+9.1f%%" % (name, y, r["below_cash"] * 100, r["loss"] * 100, r["median"] * 100, r["worst"] * 100))
+            rows.append({"strategy": name, "years": y, "below_cash": r["below_cash"], "loss": r["loss"], "median": r["median"], "worst": r["worst"]})
+    return rows
+
+
+def vs_cash_report(syms, dates, P, cost=0.003, cash_rate=0.025):
+    out = ["CONFRONTO CON UN DEPOSITO AL %.1f%% annuo, finestre mobili (costo %.2f%% a lato), %s -> %s" % (cash_rate * 100, cost * 100, dates[0], dates[-1]),
+           "%-42s %-4s | %-14s %-10s %-10s %-10s" % ("strategia", "anni", "peggio deposito", "in perdita", "mediana", "caso peggiore")]
+    for r in vs_cash_rows(syms, dates, P, cost, cash_rate):
+        out.append("%-42s %-4d | %13.0f%% %9.0f%% %+9.1f%% %+9.1f%%" % (r["strategy"], r["years"], r["below_cash"] * 100, r["loss"] * 100, r["median"] * 100, r["worst"] * 100))
     return "\n".join(out)

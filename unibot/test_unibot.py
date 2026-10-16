@@ -1110,8 +1110,43 @@ def test_sector_lab():
     check("sector: storia TVL troppo corta = None", SL.fetch_tvl("X", get=lambda url: rows[:100]) is None)
 
 
+def test_dip_lab():
+    import numpy as np
+    from . import dip_lab as D
+    px = np.concatenate([np.linspace(100, 200, 400), np.linspace(200, 90, 40), np.linspace(90, 190, 60)])
+    dd = D.drawdown(px, 365)
+    check("dip: nessun valore prima di 365 giorni di storia", not np.isfinite(dd[:364]).any() and np.isfinite(dd[364]))
+    check("dip: drawdown = prezzo / massimo - 1", abs(dd[439] - (90.0 / 200.0 - 1)) < 1e-9)
+    w = D.dip_weights(px, 0.40, 0.15, 365)
+    check("dip: entra quando scende oltre il 40% sotto il massimo", w[:400].sum() == 0 and w[439] == 1.0)
+    check("dip: esce quando recupera a meno del 15% sotto il massimo", w[-1] == 0.0 and w[440:].sum() > 0)
+    w2 = D.dip_weights(px, 0.40, 0.15, 365)
+    tr = D.trades_of(w2, px)
+    check("dip: un solo ciclo compra-vendita, in utile", len(tr) == 1 and tr[0][2] > 0)
+    pos = D.position_now(px, ["d%d" % i for i in range(len(px))])
+    check("dip: posizione attuale coerente (vicino al massimo, percentile alto)", pos["dd365"] > -0.1 and pos["pct4y"] > 0.9)
+    res, spans = D.evaluate(px, ["d%d" % i for i in range(len(px))])
+    check("dip: acquista e tieni sempre in mercato con 1 operazione", res["acquista e tieni"]["completo"]["n_trades"] == 1)
+
+
+def test_dashboard_rows():
+    import numpy as np
+    from . import dashboard as DB
+    n = 500
+    px = 100 * np.cumprod(np.full(n, 1.001))
+    dates = [(__import__("datetime").date(2024, 1, 1) + __import__("datetime").timedelta(days=i)).isoformat() for i in range(n)]
+    data = {"BTC": (dates, px), "ETH": (dates, px * 0.5)}
+    w = DB.weekly_prices(data)
+    check("dash: una riga a settimana per moneta, ordinate", len(w) == 2 * len(range(n - 1, -1, -7)) and w[0]["coin"] == "BTC" and w[0]["date"] < w[1]["date"])
+    check("dash: media a 200 giorni assente nei primi 199 giorni", any(r["sma200"] is None for r in w) and w[-1]["sma200"] is not None)
+    c = DB.cycle_rows(data)
+    check("dash: ciclo_oggi in trend rialzista = IN POSIZIONE", all(r["trend"] == "IN POSIZIONE" for r in c) and abs(c[0]["dd365"]) < 1e-9)
+    d = DB.dip_rows(data)
+    check("dash: righe compra_basso con id univoci", len({r["id"] for r in d}) == len(d) and {r["period"] for r in d} == {"completo", "1a meta'", "2a meta'"})
+
+
 def main():
-    tests_plain = [test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
+    tests_plain = [test_dashboard_rows, test_dip_lab, test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]
