@@ -1034,6 +1034,9 @@ def test_etf_forward(tmp):
     P2[-5:, 1] = 10.0
     r2 = F.compute(dates, P2, dates[230])
     check("forward: crollo sotto la media = QQQ in cassa", r2["state"]["SPY"] and not r2["state"]["QQQ"])
+    from . import etf_forward as F2
+    rc = F2._report("crypto", F2.CRYPTO_RULE, {"BTC": dict(zip(dates, up)), "ETH": dict(zip(dates, up))}, dates[230])
+    check("forward: report crypto con costo e giorni", "SMA100" in rc and "giorni: %d" % (n - 1 - 230) in rc)
     check("forward: partenza dopo l'ultimo dato = 0 giorni", F.compute(dates, P, "2099-01-01")["days"] == 0)
 
 

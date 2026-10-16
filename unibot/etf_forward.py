@@ -17,7 +17,9 @@ import numpy as np
 from . import signal_lab as L
 from . import trend_lab as T
 
-RULE = {"assets": ["SPY", "QQQ"], "sma": 200, "cost": 0.003}
+RULE = {"assets": ["SPY", "QQQ"], "sma": 200, "cost": 0.003, "name": "ETF: 50% SPY + 50% QQQ, ciascuno sopra SMA200", "ppy": 252}
+CRYPTO_RULE = {"assets": ["BTC", "ETH"], "sma": 100, "cost": 0.006, "name": "CRYPTO: 50% BTC + 50% ETH, ciascuno sopra SMA100 (costo 0,6%)", "ppy": 365}
+RULES = {"etf": RULE, "crypto": CRYPTO_RULE}
 STATE = "unibot_data/etf_forward.json"
 
 
@@ -33,6 +35,34 @@ def load_start(path=STATE, today=None):
     return start
 
 
+def load_crypto(exchange=None):
+    """Chiusure giornaliere (UTC) BTC/ETH da Coinbase, ultime 300; la candela del giorno in corso e' esclusa."""
+    import ccxt
+    ex = exchange or ccxt.coinbase({"enableRateLimit": True})
+    today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    series = {}
+    for a in CRYPTO_RULE["assets"]:
+        rows = L_retry(lambda a=a: ex.fetch_ohlcv(a + "/USDC", "1d", limit=300))
+        d = {}
+        for ts, o, h, l, c, v in rows:
+            day = datetime.datetime.fromtimestamp(ts / 1000, datetime.timezone.utc).date().isoformat()
+            if day < today and c:
+                d[day] = float(c)
+        series[a] = d
+    return series
+
+
+def L_retry(fn, tries=4):
+    import time
+    for i in range(tries):
+        try:
+            return fn()
+        except Exception:
+            if i == tries - 1:
+                raise
+            time.sleep(3 * (i + 1))
+
+
 def compute(dates, P, start, rule=RULE):
     """P: colonne = rule['assets']. Ritorna stato e curve dal giorno `start` (incluso) in poi."""
     S = T.sma(P, rule["sma"])
@@ -44,32 +74,42 @@ def compute(dates, P, start, rule=RULE):
     eq, trades, _ = T.run_weights(W[i0:], P[i0:], rule["cost"])
     bench = {a: float(P[-1, j] / P[i0, j] - 1) for j, a in enumerate(rule["assets"])}
     return {"days": len(dates) - 1 - i0, "start_used": dates[i0], "last": dates[-1], "strategy": float(eq[-1] - 1),
-            "mdd": T.metrics(eq, trades, 1.0, len(eq) - 1, ppy=252)["mdd"], "trades": trades, "bench": bench,
+            "mdd": T.metrics(eq, trades, 1.0, len(eq) - 1, ppy=rule["ppy"])["mdd"], "trades": trades, "bench": bench,
             "state": {a: bool(sig[-1, j]) for j, a in enumerate(rule["assets"])}}
 
 
-def run(path=STATE, yahoo=None, today=None):
+def _report(key, rule, series, start):
+    dates = sorted(set.intersection(*[set(d) for d in series.values()]))
+    P = np.array([[series[a][d] for a in rule["assets"]] for d in dates], dtype=float)
+    r = compute(dates, P, start, rule)
+    out = ["--- %s | partenza %s ---" % (rule["name"], start)]
+    out.append("stato (ultima chiusura %s): %s" % (r["last"], ", ".join("%s %s" % (a, "IN POSIZIONE" if v else "IN CASSA") for a, v in r["state"].items())))
+    if not r["days"]:
+        out.append("nessun giorno completo dopo la partenza: riesegui dopo la prossima chiusura.")
+    else:
+        out.append("giorni: %d | strategia %+.2f%% (calo max %.1f%%, %d operazioni) | acquista-e-tieni: %s" % (
+            r["days"], r["strategy"] * 100, r["mdd"] * 100, r["trades"],
+            ", ".join("%s %+.2f%%" % (a, v * 100) for a, v in r["bench"].items())))
+    return "\n".join(out)
+
+
+def run(path=STATE, yahoo=None, today=None, crypto_series=None):
     start = load_start(path, today)
     y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01")
-    series = {}
+    etf = {}
     for a in RULE["assets"]:
         s = y.get(a)
         if not s:
             raise RuntimeError("prezzi non disponibili per %s: riprova" % a)
-        series[a] = dict(s)
-    dates = sorted(set.intersection(*[set(d) for d in series.values()]))
-    P = np.array([[series[a][d] for a in RULE["assets"]] for d in dates], dtype=float)
-    r = compute(dates, P, start)
-    out = ["=== ETF FORWARD (paper) | regola: 50%% SPY + 50%% QQQ, ciascuno solo sopra SMA%d | partenza %s ===" % (RULE["sma"], start)]
-    out.append("stato oggi (%s): %s" % (r["last"], ", ".join("%s %s" % (a, "IN POSIZIONE" if v else "IN CASSA") for a, v in r["state"].items())))
-    if not r["days"]:
-        out.append("nessun giorno di borsa completo dopo la partenza: riesegui dopo la prossima chiusura.")
-    else:
-        out.append("giorni di borsa: %d | strategia %+.2f%% (calo max %.1f%%, %d operazioni) | acquista-e-tieni: %s" % (
-            r["days"], r["strategy"] * 100, r["mdd"] * 100, r["trades"],
-            ", ".join("%s %+.2f%%" % (a, v * 100) for a, v in r["bench"].items())))
-        out.append("Verdetto non prima di 4-8 settimane e di almeno un cambio di segnale: prima e' rumore.")
-    return "\n".join(out)
+        etf[a] = dict(s)
+    parts = ["=== TEST IN AVANTI (paper, nessun ordine reale) ===", _report("etf", RULE, etf, start)]
+    try:
+        parts.append(_report("crypto", CRYPTO_RULE, crypto_series or load_crypto(), start))
+    except Exception as e:  # noqa: BLE001
+        parts.append("--- CRYPTO: dati non raggiungibili (%s): riprova ---" % type(e).__name__)
+    parts.append("Verdetto non prima di 4-8 settimane e di almeno un cambio di segnale: prima e' rumore. "
+                 "Il bot intraday (crypto/azioni) non e' incluso: il backtest non ha mostrato vantaggio e non e' in esecuzione.")
+    return "\n".join(parts)
 
 
 def main_cli():

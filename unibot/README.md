@@ -62,6 +62,6 @@ Esito (2026-10-16): compra-e-tieni SPY +10,9%/anno ma calo massimo -55%; il tren
 e rende meno (+6,5/+9,8% con costo 0,30%); la rotazione top3 fa +8,4/+9,6% con calo -25%. Nessuna regola batte il compra-e-tieni sul rendimento:
 riduce solo il rischio. Il trend su EFA (ex-USA) e' piu' debole (+2/+4%).
 
-## ETF forward (`python -m unibot.run --etf-forward`)
-Test in avanti (paper) della regola fissa 50% SPY + 50% QQQ, ciascuno solo sopra la SMA200. La data di partenza si fissa alla prima esecuzione
+## Test in avanti (`python -m unibot.run --etf-forward`)
+Due regole fisse (paper): ETF = 50% SPY + 50% QQQ ciascuno solo sopra la SMA200; CRYPTO = 50% BTC + 50% ETH ciascuno solo sopra la SMA100 (costo 0,6%). Report giornaliero schedulato alle 08:00. La data di partenza si fissa alla prima esecuzione
 (2026-10-16) in `unibot_data/etf_forward.json`; ogni lancio ricalcola tutto dai prezzi. Verdetto non prima di 4-8 settimane.
