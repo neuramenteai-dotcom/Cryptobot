@@ -24,7 +24,11 @@ STATE = "unibot_data/etf_forward.json"
 
 
 def load_start(path=STATE, today=None):
-    """Data di partenza fissata alla prima esecuzione (poi non cambia)."""
+    """Data di partenza fissata alla prima esecuzione (poi non cambia). In cloud: UNIBOT_FORWARD_START (AAAA-MM-GG)."""
+    env = os.getenv("UNIBOT_FORWARD_START", "").strip()
+    if env:
+        datetime.date.fromisoformat(env)  # ValueError se malformata: meglio fermarsi che partire da una data sbagliata
+        return env
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)["start"]
@@ -112,9 +116,72 @@ def run(path=STATE, yahoo=None, today=None, crypto_series=None):
     return "\n".join(parts)
 
 
-def main_cli():
+def state_changes(prev, new):
+    """Confronta {regola: {asset: bool}} fra due esecuzioni: elenco dei segnali cambiati."""
+    out = []
+    for key, assets in new.items():
+        for a, v in assets.items():
+            old = (prev or {}).get(key, {}).get(a)
+            if old is not None and old != v:
+                out.append("%s %s: %s -> %s" % (key.upper(), a, "IN POSIZIONE" if old else "IN CASSA", "IN POSIZIONE" if v else "IN CASSA"))
+    return out
+
+
+def current_states(series_by_key):
+    out = {}
+    for key, series in series_by_key.items():
+        rule = RULES[key]
+        dates = sorted(set.intersection(*[set(d) for d in series.values()]))
+        P = np.array([[series[a][d] for a in rule["assets"]] for d in dates], dtype=float)
+        S = T.sma(P, rule["sma"])
+        out[key] = {a: bool(P[-1, j] > S[-1, j]) if np.isfinite(S[-1, j]) else False for j, a in enumerate(rule["assets"])}
+    return out
+
+
+def write_cloud_report(out_dir, report, states, today=None):
+    """Scrive latest.md, history/<data>.md e state.json in out_dir; ritorna i cambi di segnale rispetto a state.json precedente."""
+    today = (today or datetime.date.today()).isoformat()
+    os.makedirs(os.path.join(out_dir, "history"), exist_ok=True)
+    sp = os.path.join(out_dir, "state.json")
+    prev = None
+    if os.path.exists(sp):
+        with open(sp, "r", encoding="utf-8") as f:
+            prev = json.load(f)
+    changes = state_changes(prev, states)
+    text = report + ("\n\nSEGNALE CAMBIATO: " + "; ".join(changes) if changes else "\n\nNessun cambio di segnale dall'ultima esecuzione.")
+    for fn in ("latest.md", os.path.join("history", today + ".md")):
+        with open(os.path.join(out_dir, fn), "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+    with open(sp, "w", encoding="utf-8") as f:
+        json.dump(states, f)
+    return text, changes
+
+
+def run_cloud(out_dir, yahoo=None, crypto_series=None, today=None):
+    """Una esecuzione non presidiata: calcola, scrive i file in out_dir, ritorna il testo."""
+    start = load_start(os.path.join(out_dir, "start.json"), today)
+    y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01")
+    etf = {}
+    for a in RULE["assets"]:
+        s = y.get(a)
+        if not s:
+            raise RuntimeError("prezzi non disponibili per %s" % a)
+        etf[a] = dict(s)
+    series = {"etf": etf}
+    parts = ["=== TEST IN AVANTI (paper, nessun ordine reale) ===", _report("etf", RULE, etf, start)]
     try:
-        print(run())
+        cs = crypto_series or load_crypto()
+        series["crypto"] = cs
+        parts.append(_report("crypto", CRYPTO_RULE, cs, start))
+    except Exception as e:  # noqa: BLE001
+        parts.append("--- CRYPTO: dati non raggiungibili (%s) ---" % type(e).__name__)
+    text, _ = write_cloud_report(out_dir, "\n".join(parts), current_states(series), today)
+    return text
+
+
+def main_cli(out_dir=None):
+    try:
+        print(run_cloud(out_dir) if out_dir else run())
         return 0
     except Exception as e:  # noqa: BLE001
         print("etf-forward non eseguito: %s" % e)

@@ -1060,12 +1060,37 @@ def test_daily_lab():
     check("daily: costo ingresso e uscita applicati", abs(eq2[-1] - 1.05 * 0.99 * 0.99) < 1e-12)
 
 
+def test_forward_cloud(tmp):
+    import datetime as dt
+    from . import etf_forward as F
+    prev = {"etf": {"SPY": True, "QQQ": True}, "crypto": {"BTC": True, "ETH": True}}
+    new = {"etf": {"SPY": True, "QQQ": False}, "crypto": {"BTC": True, "ETH": True}}
+    check("cloud: rileva il cambio QQQ", F.state_changes(prev, new) == ["ETF QQQ: IN POSIZIONE -> IN CASSA"])
+    check("cloud: primo giro senza stato precedente = nessun cambio", F.state_changes(None, new) == [])
+    d = os.path.join(tmp, "rep")
+    t1, c1 = F.write_cloud_report(d, "R", prev, dt.date(2026, 10, 17))
+    check("cloud: primo report scritto, nessun cambio", c1 == [] and os.path.exists(os.path.join(d, "latest.md")) and os.path.exists(os.path.join(d, "history", "2026-10-17.md")))
+    t2, c2 = F.write_cloud_report(d, "R", new, dt.date(2026, 10, 18))
+    check("cloud: secondo report segnala il cambio nel testo", c2 == ["ETF QQQ: IN POSIZIONE -> IN CASSA"] and "SEGNALE CAMBIATO" in open(os.path.join(d, "latest.md"), encoding="utf-8").read())
+    os.environ["UNIBOT_FORWARD_START"] = "2026-10-16"
+    try:
+        check("cloud: la data di partenza viene dalla variabile d'ambiente", F.load_start(os.path.join(tmp, "x.json")) == "2026-10-16")
+        os.environ["UNIBOT_FORWARD_START"] = "boh"
+        try:
+            F.load_start(os.path.join(tmp, "x.json"))
+            check("cloud: data malformata = errore", False)
+        except ValueError:
+            check("cloud: data malformata = errore", True)
+    finally:
+        os.environ.pop("UNIBOT_FORWARD_START", None)
+
+
 def main():
     tests_plain = [test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]
-    tests_tmp = [test_etf_forward, test_engine_crypto_flow, test_engine_panic_block, test_circuit_breaker,
+    tests_tmp = [test_forward_cloud, test_etf_forward, test_engine_crypto_flow, test_engine_panic_block, test_circuit_breaker,
                  test_daily_loss_limit, test_stock_flatten_and_old_positions, test_stock_entry_flow,
                  test_signals, test_persistence, test_signal_loader, test_price_history_cache,
                  test_network_resilience, test_yahoo_history, test_insider_loader, test_trend_lab]
