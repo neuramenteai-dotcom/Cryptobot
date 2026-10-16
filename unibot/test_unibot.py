@@ -1040,8 +1040,21 @@ def test_etf_forward(tmp):
     check("forward: partenza dopo l'ultimo dato = 0 giorni", F.compute(dates, P, "2099-01-01")["days"] == 0)
 
 
+def test_daily_lab():
+    import numpy as np
+    from . import daily_lab as D
+    r = np.array([0.02, -0.01, -0.03, 0.05, 0.0, 0.02])
+    cs = D.cond_stats(r, 0.015)
+    check("daily: dopo rialzo > soglia (giorni 0,3,5 -> successivi -0.01, 0.0)", cs["up"]["n"] == 2 and abs(cs["up"]["mean"] - (-0.005)) < 1e-12)
+    check("daily: dopo calo < -soglia (giorno 2 -> 0.05)", cs["down"]["n"] == 1 and abs(cs["down"]["mean"] - 0.05) < 1e-12)
+    eq, days, _ = D.rule_equity(r, 0.015, "contrario", 0.0)
+    check("daily: 'contrario' guadagna il +5% del giorno dopo il calo", days == 1 and abs(eq[-1] - 1.05) < 1e-12)
+    eq2, _, _ = D.rule_equity(r, 0.015, "contrario", 0.01)
+    check("daily: costo ingresso e uscita applicati", abs(eq2[-1] - 1.05 * 0.99 * 0.99) < 1e-12)
+
+
 def main():
-    tests_plain = [test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
+    tests_plain = [test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]

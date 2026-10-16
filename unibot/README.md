@@ -65,3 +65,8 @@ riduce solo il rischio. Il trend su EFA (ex-USA) e' piu' debole (+2/+4%).
 ## Test in avanti (`python -m unibot.run --etf-forward`)
 Due regole fisse (paper): ETF = 50% SPY + 50% QQQ ciascuno solo sopra la SMA200; CRYPTO = 50% BTC + 50% ETH ciascuno solo sopra la SMA100 (costo 0,6%). Report giornaliero schedulato alle 08:00. La data di partenza si fissa alla prima esecuzione
 (2026-10-16) in `unibot_data/etf_forward.json`; ogni lancio ricalcola tutto dai prezzi. Verdetto non prima di 4-8 settimane.
+
+## Variazioni giornaliere (`unibot/daily_lab.py`, 2026-10-16)
+Rendimento del giorno dopo un movimento > ±1% / ±2% (chiusura-chiusura). SPY/QQQ (21 anni): dopo un forte calo il giorno dopo rende in media +0,17..+0,35%
+(t~2: effetto reale ma piccolo), dopo un rialzo e' neutro o negativo. 'Segui il rialzo' perde 30-65% netto. 'Compra dopo il calo' >2% su SPY: +5% / +28% in dieci anni
+(in mercato ~4% dei giorni), molto sotto compra-e-tieni, e con costo 0,3%/lato (piu' dell'edge) sparisce. BTC/ETH: nessun effetto (t<1), i costi 0,6% distruggono tutto.
