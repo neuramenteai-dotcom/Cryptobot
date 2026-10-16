@@ -72,6 +72,7 @@ def main(argv=None):
     ap.add_argument("--etf-lab", action="store_true", help="prestazioni di 9 ETF dal 2005 e regole semplici a bassa rotazione")
     ap.add_argument("--etf-forward", action="store_true", help="test in avanti (paper) della regola fissa trend SPY+QQQ")
     ap.add_argument("--forward-out", metavar="CARTELLA", default=None, help="con --etf-forward: scrive latest.md/state.json (uso in cloud)")
+    ap.add_argument("--sector-lab", action="store_true", help="settori crypto: crescita per anno, persistenza, flussi di capitale")
     ap.add_argument("--quarters", default=None, help="es. 2025q1,2025q2 (default: 2025q1..2026q3)")
     ap.add_argument("--reset", action="store_true")
     ap.add_argument("--yes", action="store_true")
@@ -122,6 +123,9 @@ def main(argv=None):
     if a.trend_lab:
         from . import trend_lab
         return trend_lab.main_cli()
+    if a.sector_lab:
+        from . import sector_lab
+        return sector_lab.main_cli()
     if a.etf_forward:
         from . import etf_forward
         return etf_forward.main_cli(a.forward_out)

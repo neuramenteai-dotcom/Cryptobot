@@ -70,3 +70,8 @@ Due regole fisse (paper): ETF = 50% SPY + 50% QQQ ciascuno solo sopra la SMA200;
 Rendimento del giorno dopo un movimento > ±1% / ±2% (chiusura-chiusura). SPY/QQQ (21 anni): dopo un forte calo il giorno dopo rende in media +0,17..+0,35%
 (t~2: effetto reale ma piccolo), dopo un rialzo e' neutro o negativo. 'Segui il rialzo' perde 30-65% netto. 'Compra dopo il calo' >2% su SPY: +5% / +28% in dieci anni
 (in mercato ~4% dei giorni), molto sotto compra-e-tieni, e con costo 0,3%/lato (piu' dell'edge) sparisce. BTC/ETH: nessun effetto (t<1), i costi 0,6% distruggono tutto.
+
+## Settori crypto (`python -m unibot.run --sector-lab`, 2026-10-16)
+60 monete in 8 settori, 2023-2026. Nel 2023-24 i settori piccoli (L2, AI, meme, DeFi) battono BTC di molto; nel 2025 tutti perdono 60-80% (BTC -5%); nel 2026 nessuno guadagna.
+Seguire il settore leader a 90 giorni: +110% nel 2023-24, -36% nel 2025-26 (BTC compra e tieni: +458% e -13%). La leadership si ripete poco (correlazione di rango +0,11, t=1,6).
+Flussi (TVL, DefiLlama): a 1 anno crescono solo Near (+61%), Base (+26%), Optimism (+25%); Ethereum -41%, Solana -47%, Sui -75%.

@@ -1085,8 +1085,33 @@ def test_forward_cloud(tmp):
         os.environ.pop("UNIBOT_FORWARD_START", None)
 
 
+def test_sector_lab():
+    import numpy as np
+    from . import sector_lab as SL
+    coins = ["SOL", "ADA", "AVAX", "UNI", "AAVE", "COMP", "BTC"]
+    n = 200
+    P = np.ones((n, len(coins)))
+    for j, c in enumerate(coins):
+        P[:, j] = 100 * np.cumprod(np.full(n, 1.0 + (0.002 if c in ("SOL", "ADA", "AVAX") else 0.0005)))
+    syms = [c + "USDT" for c in coins]
+    names, S, members = SL.sector_matrix(P, syms)
+    check("sector: solo settori con almeno 3 monete (L1 grandi e DeFi)", set(names) == {"Blockchain L1 grandi", "DeFi"})
+    check("sector: rendimento giornaliero = media delle monete del settore", abs(S[0, names.index("Blockchain L1 grandi")] - 0.002) < 1e-9)
+    W = SL.leader_weights(P, S, syms, k=1, lookback=60, every=30)
+    check("sector: senza storia = cassa", W[:60].sum() == 0)
+    sol, uni = syms.index("SOLUSDT"), syms.index("UNIUSDT")
+    check("sector: tiene il settore migliore (L1) a pesi uguali", abs(W[100, sol] - 1 / 3) < 1e-9 and W[100, uni] == 0 and abs(W[100].sum() - 1.0) < 1e-9)
+    perfect = np.column_stack([np.full(300, 0.002), np.full(300, 0.001), np.full(300, 0.0)])
+    pr = SL.persistence(perfect, lookback=30, horizon=30)
+    check("sector: stessa classifica sempre = persistenza 1", abs(pr["mean"] - 1.0) < 1e-9)
+    rows = [{"tvl": 100.0 + i} for i in range(500)]
+    r = SL.fetch_tvl("Solana", get=lambda url: rows)
+    check("sector: variazione TVL a 90 giorni e a 1 anno", abs(r["d90"] - (rows[-1]["tvl"] / rows[-91]["tvl"] - 1)) < 1e-12 and abs(r["y1"] - (rows[-1]["tvl"] / rows[-366]["tvl"] - 1)) < 1e-12)
+    check("sector: storia TVL troppo corta = None", SL.fetch_tvl("X", get=lambda url: rows[:100]) is None)
+
+
 def main():
-    tests_plain = [test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
+    tests_plain = [test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]
