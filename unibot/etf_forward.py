@@ -40,6 +40,12 @@ def load_start(path=STATE, today=None):
     return start
 
 
+def complete_days(series, today=None):
+    """Toglie la barra del giorno in corso (UTC): e' incompleta finche' il mercato non chiude, e usarla darebbe un segnale provvisorio."""
+    today = (today or datetime.datetime.now(datetime.timezone.utc).date()).isoformat()
+    return {k: v for k, v in dict(series).items() if k < today}
+
+
 def load_crypto(exchange=None):
     """Chiusure giornaliere (UTC) BTC/ETH da Coinbase, ultime 300; la candela del giorno in corso e' esclusa."""
     import ccxt
@@ -106,7 +112,7 @@ def run(path=STATE, yahoo=None, today=None, crypto_series=None):
         s = y.get(a)
         if not s:
             raise RuntimeError("prezzi non disponibili per %s: riprova" % a)
-        etf[a] = dict(s)
+        etf[a] = complete_days(s)
     parts = ["=== TEST IN AVANTI (paper, nessun ordine reale) ===", _report("etf", RULE, etf, start)]
     try:
         cs = crypto_series or load_crypto()
@@ -169,7 +175,7 @@ def run_cloud(out_dir, yahoo=None, crypto_series=None, today=None):
         s = y.get(a)
         if not s:
             raise RuntimeError("prezzi non disponibili per %s" % a)
-        etf[a] = dict(s)
+        etf[a] = complete_days(s)
     series = {"etf": etf}
     parts = ["=== TEST IN AVANTI (paper, nessun ordine reale) ===", _report("etf", RULE, etf, start)]
     try:

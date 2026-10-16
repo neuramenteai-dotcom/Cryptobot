@@ -92,7 +92,7 @@ def forward_rows(start=None):
     start = start or os.getenv("UNIBOT_FORWARD_START") or "2026-10-16"
     y = L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01")
     cs = etf_forward.load_crypto()
-    series = {"etf": {a: dict(y.get(a)) for a in etf_forward.RULE["assets"]}, "crypto": cs, "crypto50": cs}
+    series = {"etf": {a: etf_forward.complete_days(y.get(a)) for a in etf_forward.RULE["assets"]}, "crypto": cs, "crypto50": cs}
     rows = []
     for key, rule in etf_forward.RULES.items():
         s = series[key]
