@@ -16,3 +16,9 @@ __pycache__/
 
 # Editor
 .vscode/
+
+# Unibot: cache locale prezzi e stato
+unibot_prices/
+unibot_state.db
+unibot_signals.json
+unibot_data/
