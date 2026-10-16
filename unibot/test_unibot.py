@@ -1159,8 +1159,33 @@ def test_sma_scan():
     check("scan: trend costante = una sola entrata", abs(up[5]["trades_y"] - (1 / (400 / 365.0)) / 2.0) < 1e-9)
 
 
+def test_ma_scan():
+    import numpy as np
+    from . import ma_scan_lab as M
+    px = np.array([10, 11, 12, 11, 13, 14, 12, 15], dtype=float)
+    sig = M.prior_mean_signals(px, ns=np.array([1, 2]))
+    check("ma: N=1 e' 'oggi sopra ieri' (primo giorno = 0)", sig[:, 0].tolist() == [False, True, True, False, True, True, False, True])
+    check("ma: N=2 usa la media dei 2 giorni precedenti, 0 prima di 2 giorni", sig[:2, 1].sum() == 0 and sig[2, 1] and not sig[3, 1] and sig[4, 1])
+    up = 100 * np.cumprod(np.full(300, 1.001))
+    s2 = M.prior_mean_signals(up, ns=np.array([5, 50]))
+    r0 = M.backtest(up, s2, 0.0, 365)
+    r1 = M.backtest(up, s2, 0.01, 365)
+    check("ma: trend rialzista a costo 0 = quasi compra-e-tieni", r0["cagr"][0] > 0.3 and r0["mdd"][0] > -0.01)
+    check("ma: il costo riduce il rendimento", r1["cagr"][0] < r0["cagr"][0] and r1["cagr"][1] < r0["cagr"][1])
+    flat = M.backtest(np.full(300, 100.0), M.prior_mean_signals(np.full(300, 100.0), ns=np.array([5])), 0.01, 365)
+    check("ma: prezzo fermo = nessun segnale e nessuna perdita", flat["cagr"][0] == 0.0 and flat["cycles_y"][0] == 0.0)
+    rng = np.random.default_rng(3)
+    px2 = 100 * np.cumprod(1 + rng.normal(0, 0.02, 800))
+    a = M.analyze_asset(px2, 0.002, 252, 400)
+    check("ma: tre finestre e B&H per ciascuna", set(a) == {"full", "h1", "h2"} and a["h2"]["bh"]["cagr"] == M.buy_hold(px2[400:], 252)["cagr"])
+    sig_full = M.prior_mean_signals(px2)
+    check("ma: nessuna informazione futura (segnale di t invariato se cambia il prezzo dopo t)", (M.prior_mean_signals(np.concatenate([px2[:500], px2[500:] * 3]))[:500] == sig_full[:500]).all())
+    ag = M.aggregate([a, a])
+    check("ma: aggregazione per 200 N", len(ag["h1_cagr_med"]) == 200 and ag["n_assets"] == 2 and M.best_n_in_sample(ag)[0] in range(1, 201))
+
+
 def main():
-    tests_plain = [test_sma_scan, test_dashboard_rows, test_dip_lab, test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
+    tests_plain = [test_ma_scan, test_sma_scan, test_dashboard_rows, test_dip_lab, test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]

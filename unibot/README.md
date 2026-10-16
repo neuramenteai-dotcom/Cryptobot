@@ -84,3 +84,8 @@ Flussi (TVL, DefiLlama): a 1 anno crescono solo Near (+61%), Base (+26%), Optimi
 ## Trend a breve (`--short-trend`, 2026-10-16)
 Media a 5/10/20/50/100/200 giorni su BTC, ETH, BNB, XRP, SOL a costo 0 / 0,35% / 0,6% a lato. Le medie corte rendono molto prima dei costi (BTC SMA5 +37.425%) ma con 30-48 cicli l'anno
 i costi le distruggono: a 0,6% BTC SMA5 -53%, SMA10 +352% (seconda meta' -45% e calo -89%). Il punto migliore e' SMA20-50 (9-19 cicli/anno); SMA50 su BTC +19.822% con calo -63% (scelta fra sei medie: ottimistico).
+
+## Scansione medie N=1..200 (`--ma-scan`, 2026-10-16)
+Segnale: chiusura > media delle N chiusure precedenti. N scelta sulla 1a meta' dei dati, verificata sulla 2a. Gruppi: 60 monete (2023-26), 5 grandi crypto (dal 2014/17/20), 39 ETF, 9 indici.
+Esito: N=1..20 perdono ovunque dopo i costi (anche a 0,1%). ETF e indici: nessun asset batte il 10% netto in entrambe le meta' (mediana +3..5%, compra-e-tieni +8..10%): la media riduce il calo (-36% vs -41..-60%), non aumenta il rendimento.
+Crypto grandi: zona stabile N=30..200 (N=50: 4 asset su 5 sopra il 10% in entrambe le meta', mediana +72% / +24% annuo, calo -65%): ma 5 monete sopravvissute, forte survivorship. 60 monete: nel 2025-26 tutte le N perdono (-23..-57% annuo).
