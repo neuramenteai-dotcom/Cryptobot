@@ -1145,8 +1145,22 @@ def test_dashboard_rows():
     check("dash: righe compra_basso con id univoci", len({r["id"] for r in d}) == len(d) and {r["period"] for r in d} == {"completo", "1a meta'", "2a meta'"})
 
 
+def test_sma_scan():
+    import numpy as np
+    from . import dip_lab as D
+    rng = np.random.default_rng(1)
+    px = 100 * np.cumprod(1 + rng.normal(0.0, 0.03, 900))
+    sc = D.sma_scan(px, ns=(5, 50), costs=(0.0, 0.006))
+    check("scan: piu' costo = rendimento minore", sc[5]["total@0.006"] < sc[5]["total@0"] and sc[50]["total@0.006"] < sc[50]["total@0"])
+    check("scan: media corta = piu' operazioni all'anno", sc[5]["trades_y"] > sc[50]["trades_y"] > 0)
+    flat = D.sma_scan(np.full(400, 100.0), ns=(5,), costs=(0.0, 0.006))
+    check("scan: prezzo fermo = nessun segnale e nessun costo", flat[5]["total@0.006"] == 0.0 and flat[5]["trades_y"] == 0.0)
+    up = D.sma_scan(100 * np.cumprod(np.full(400, 1.01)), ns=(5,), costs=(0.0, 0.006))
+    check("scan: trend costante = una sola entrata", abs(up[5]["trades_y"] - (1 / (400 / 365.0)) / 2.0) < 1e-9)
+
+
 def main():
-    tests_plain = [test_dashboard_rows, test_dip_lab, test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
+    tests_plain = [test_sma_scan, test_dashboard_rows, test_dip_lab, test_sector_lab, test_daily_lab, test_etf_lab, test_exit_rules, test_paper_math, test_crypto_rules, test_stock_rules,
                    test_market_state, test_fmp_budget, test_fmp_block_scope, test_stock_tradable, test_stock_universe,
                    test_signal_lab_eval, test_backtest_replay, test_insider_variants, test_welch_placebo,
                    test_quiver_loader, test_funding_helpers, test_funding_stats, test_funding_fetch_paging]

@@ -80,3 +80,7 @@ Flussi (TVL, DefiLlama): a 1 anno crescono solo Near (+61%), Base (+26%), Optimi
 `--dip-lab`: su BTC (dal 2014), ETH/BNB/XRP/SOL. Compra a -30..-60% dal massimo a 365 giorni, vendi a -10..-30%: su BTC +83..+207% in 12 anni contro +17.710% di compra e tieni
 (+15.229% col trend SMA200, calo massimo -71% invece di -83%). Il trend SMA200 e' l'unica regola che regge su BTC/ETH/SOL; su XRP e BNB nessuna batte compra e tieni.
 `--dashboard-data`: scrive le tabelle JSON per la dashboard (Artifact, snapshot) in `unibot_data/dashboard/`; si rigenerano e ricaricano quando si vuole aggiornarla.
+
+## Trend a breve (`--short-trend`, 2026-10-16)
+Media a 5/10/20/50/100/200 giorni su BTC, ETH, BNB, XRP, SOL a costo 0 / 0,35% / 0,6% a lato. Le medie corte rendono molto prima dei costi (BTC SMA5 +37.425%) ma con 30-48 cicli l'anno
+i costi le distruggono: a 0,6% BTC SMA5 -53%, SMA10 +352% (seconda meta' -45% e calo -89%). Il punto migliore e' SMA20-50 (9-19 cicli/anno); SMA50 su BTC +19.822% con calo -63% (scelta fra sei medie: ottimistico).

@@ -132,3 +132,50 @@ def main_cli():
     except Exception as e:  # noqa: BLE001
         print("dip-lab non eseguito: %s" % e)
         return 2
+
+
+SCAN_N = (5, 10, 20, 50, 100, 200)
+SCAN_COSTS = (0.0, 0.0035, 0.006)
+
+
+def sma_scan(px, ns=SCAN_N, costs=SCAN_COSTS):
+    """Trend sopra la media a N giorni: rendimento totale e calo massimo a diversi costi, operazioni all'anno, tempo in mercato, meta' per meta'."""
+    px = np.asarray(px, dtype=float)
+    P = px[:, None]
+    mid = len(px) // 2
+    out = {}
+    for n in ns:
+        w = trend_w(px, n)
+        row = {"n": n}
+        for cost in costs:
+            eq, tr, inv = T.run_weights(w[:, None], P, cost)
+            m = T.metrics(eq, tr, inv, len(px))
+            row["total@%g" % cost] = m["total"]
+            row["mdd@%g" % cost] = m["mdd"]
+            row["sharpe@%g" % cost] = m["sharpe"]
+            row["trades_y"] = m["trades_y"] / 2.0   # run_weights conta ingressi e uscite: cicli = meta'
+            row["invested"] = m["invested"]
+        for lbl, (a, b) in (("h1", (0, mid)), ("h2", (mid, len(px)))):
+            eq, tr, inv = T.run_weights(w[a:b, None], P[a:b], costs[-1])
+            row["total_" + lbl] = T.metrics(eq, tr, inv, b - a)["total"]
+        out[n] = row
+    return out
+
+
+def format_scan(name, scan, costs=SCAN_COSTS):
+    lines = ["--- %s ---" % name,
+             "%-8s | %-12s %-12s %-18s | %-8s %-8s | %-10s %-10s" % ("media", "senza costi", "costo 0,35%", "costo 0,6% (rend./calo)", "op/anno", "in merc.", "1a meta'", "2a meta'")]
+    for n, r in scan.items():
+        lines.append("SMA %-4d | %+10.0f%% %+10.0f%% %+9.0f%% %6.0f%% | %6.0f %7.0f%% | %+9.0f%% %+9.0f%%" % (
+            n, r["total@0"] * 100, r["total@0.0035"] * 100, r["total@0.006"] * 100, r["mdd@0.006"] * 100, r["trades_y"], r["invested"] * 100, r["total_h1"] * 100, r["total_h2"] * 100))
+    return "\n".join(lines)
+
+
+def run_scan(cache_dir="unibot_data/crypto_long"):
+    data = load_long(cache_dir)
+    parts = ["=== TREND A BREVE (media a 5-200 giorni), chiusura giornaliera, solo posizioni lunghe ==="]
+    for sym in ("BTC", "ETH", "BNB", "XRP", "SOL"):
+        dates, px = data[sym]
+        parts.append(format_scan("%s %s -> %s" % (sym, dates[0], dates[-1]), sma_scan(px)))
+    parts.append("Colonne: rendimento totale a tre livelli di costo di un lato; 'op/anno' = cicli compra-vendita all'anno; ultime due colonne a costo 0,6%.")
+    return "\n".join(parts)
