@@ -89,3 +89,7 @@ i costi le distruggono: a 0,6% BTC SMA5 -53%, SMA10 +352% (seconda meta' -45% e 
 Segnale: chiusura > media delle N chiusure precedenti. N scelta sulla 1a meta' dei dati, verificata sulla 2a. Gruppi: 60 monete (2023-26), 5 grandi crypto (dal 2014/17/20), 39 ETF, 9 indici.
 Esito: N=1..20 perdono ovunque dopo i costi (anche a 0,1%). ETF e indici: nessun asset batte il 10% netto in entrambe le meta' (mediana +3..5%, compra-e-tieni +8..10%): la media riduce il calo (-36% vs -41..-60%), non aumenta il rendimento.
 Crypto grandi: zona stabile N=30..200 (N=50: 4 asset su 5 sopra il 10% in entrambe le meta', mediana +72% / +24% annuo, calo -65%): ma 5 monete sopravvissute, forte survivorship. 60 monete: nel 2025-26 tutte le N perdono (-23..-57% annuo).
+
+## Costi bassi sulle crypto (2026-10-16)
+Scansione a 0,1% e 0,075% a lato (Binance): le medie corte migliorano ma restano fragili. 5 grandi: N=7..20 danno +14..+16% nella 2a meta' (contro +29% della N=50), 60 monete nel 2025-26 tutte negative (-17..-42%).
+La N scelta in campione (N=7..12) fuori campione fa +2..+4%: nessuna media corta e' affidabile neppure a costi bassi. Aggiunto il test in avanti 50% BTC + 50% ETH sopra SMA50.

@@ -19,7 +19,8 @@ from . import trend_lab as T
 
 RULE = {"assets": ["SPY", "QQQ"], "sma": 200, "cost": 0.003, "name": "ETF: 50% SPY + 50% QQQ, ciascuno sopra SMA200", "ppy": 252}
 CRYPTO_RULE = {"assets": ["BTC", "ETH"], "sma": 100, "cost": 0.006, "name": "CRYPTO: 50% BTC + 50% ETH, ciascuno sopra SMA100 (costo 0,6%)", "ppy": 365}
-RULES = {"etf": RULE, "crypto": CRYPTO_RULE}
+CRYPTO50_RULE = {"assets": ["BTC", "ETH"], "sma": 50, "cost": 0.006, "name": "CRYPTO: 50% BTC + 50% ETH, ciascuno sopra SMA50 (costo 0,6%)", "ppy": 365}
+RULES = {"etf": RULE, "crypto": CRYPTO_RULE, "crypto50": CRYPTO50_RULE}
 STATE = "unibot_data/etf_forward.json"
 
 
@@ -108,7 +109,9 @@ def run(path=STATE, yahoo=None, today=None, crypto_series=None):
         etf[a] = dict(s)
     parts = ["=== TEST IN AVANTI (paper, nessun ordine reale) ===", _report("etf", RULE, etf, start)]
     try:
-        parts.append(_report("crypto", CRYPTO_RULE, crypto_series or load_crypto(), start))
+        cs = crypto_series or load_crypto()
+        parts.append(_report("crypto", CRYPTO_RULE, cs, start))
+        parts.append(_report("crypto50", CRYPTO50_RULE, cs, start))
     except Exception as e:  # noqa: BLE001
         parts.append("--- CRYPTO: dati non raggiungibili (%s): riprova ---" % type(e).__name__)
     parts.append("Verdetto non prima di 4-8 settimane e di almeno un cambio di segnale: prima e' rumore. "
@@ -172,7 +175,9 @@ def run_cloud(out_dir, yahoo=None, crypto_series=None, today=None):
     try:
         cs = crypto_series or load_crypto()
         series["crypto"] = cs
+        series["crypto50"] = cs
         parts.append(_report("crypto", CRYPTO_RULE, cs, start))
+        parts.append(_report("crypto50", CRYPTO50_RULE, cs, start))
     except Exception as e:  # noqa: BLE001
         parts.append("--- CRYPTO: dati non raggiungibili (%s) ---" % type(e).__name__)
     text, _ = write_cloud_report(out_dir, "\n".join(parts), current_states(series), today)
