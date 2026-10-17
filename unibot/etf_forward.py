@@ -106,7 +106,7 @@ def _report(key, rule, series, start):
 
 def run(path=STATE, yahoo=None, today=None, crypto_series=None):
     start = load_start(path, today)
-    y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01")
+    y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01", max_age=3600)
     etf = {}
     for a in RULE["assets"]:
         s = y.get(a)
@@ -169,7 +169,7 @@ def write_cloud_report(out_dir, report, states, today=None):
 def run_cloud(out_dir, yahoo=None, crypto_series=None, today=None):
     """Una esecuzione non presidiata: calcola, scrive i file in out_dir, ritorna il testo."""
     start = load_start(os.path.join(out_dir, "start.json"), today)
-    y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01")
+    y = yahoo or L.YahooHistory(cache_dir="unibot_data/etf_prices", start="2024-01-01", max_age=3600)
     etf = {}
     for a in RULE["assets"]:
         s = y.get(a)

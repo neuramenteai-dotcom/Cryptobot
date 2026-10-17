@@ -220,8 +220,9 @@ class YahooHistory:
     URL = "https://query1.finance.yahoo.com/v8/finance/chart/%s"
 
     def __init__(self, cache_dir="unibot_prices", start="2024-12-01", http=None, clock=time.time,
-                 retry_delay=2.0, pause=0.25):
+                 retry_delay=2.0, pause=0.25, max_age=86400):
         self.cache_dir, self.start, self.clock = cache_dir, start, clock
+        self.max_age = max_age        # secondi di validita' della cache su disco
         self.http = http
         self.retry_delay, self.pause = retry_delay, pause
         self.failed = set()           # nessun dato (titolo sconosciuto o ritirato)
@@ -242,7 +243,7 @@ class YahooHistory:
 
     def _get(self, symbol):
         path = self._path(symbol)
-        if os.path.exists(path) and self.clock() - os.path.getmtime(path) < 86400:
+        if os.path.exists(path) and self.clock() - os.path.getmtime(path) < self.max_age:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     return [tuple(x) for x in json.load(f)] or None
