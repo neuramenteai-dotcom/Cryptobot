@@ -3,10 +3,10 @@
 stato (ultima chiusura 2026-10-16): SPY IN POSIZIONE, QQQ IN POSIZIONE
 nessun giorno completo dopo la partenza: riesegui dopo la prossima chiusura.
 --- CRYPTO: 50% BTC + 50% ETH, ciascuno sopra SMA100 (costo 0,6%) | partenza 2026-10-16 ---
-stato (ultima chiusura 2026-10-16): BTC IN POSIZIONE, ETH IN POSIZIONE
-nessun giorno completo dopo la partenza: riesegui dopo la prossima chiusura.
+stato (ultima chiusura 2026-10-17): BTC IN POSIZIONE, ETH IN POSIZIONE
+giorni: 1 | strategia -1.09% (calo max -1.1%, 2 operazioni) | acquista-e-tieni: BTC -0.15%, ETH -0.84%
 --- CRYPTO: 50% BTC + 50% ETH, ciascuno sopra SMA50 (costo 0,6%) | partenza 2026-10-16 ---
-stato (ultima chiusura 2026-10-16): BTC IN POSIZIONE, ETH IN CASSA
-nessun giorno completo dopo la partenza: riesegui dopo la prossima chiusura.
+stato (ultima chiusura 2026-10-17): BTC IN POSIZIONE, ETH IN CASSA
+giorni: 1 | strategia -0.37% (calo max -0.4%, 1 operazioni) | acquista-e-tieni: BTC -0.15%, ETH -0.84%
 
 Nessun cambio di segnale dall'ultima esecuzione.
